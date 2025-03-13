@@ -160,7 +160,7 @@ class PresencaController extends Controller
             $validatedData = $request->validate([
                 'viagem_id' => 'required|integer|exists:viagens,id',
                 'aluno_id' => 'required|integer|exists:alunos,id',
-                'hora_registro' => 'required|date_format:H:i',
+                'hora_embarque' => 'required|date_format:H:i',
                 'presente' => 'required|boolean',
                 'observacoes' => 'nullable|string|max:255'
             ]);
@@ -211,7 +211,7 @@ class PresencaController extends Controller
             $validatedData = $request->validate([
                 'viagem_id' => 'sometimes|required|integer|exists:viagens,id',
                 'aluno_id' => 'sometimes|required|integer|exists:alunos,id',
-                'hora_registro' => 'sometimes|required|date_format:H:i',
+                'hora_embarque' => 'sometimes|required|date_format:H:i',
                 'presente' => 'sometimes|required|boolean',
                 'observacoes' => 'nullable|string|max:255'
             ]);

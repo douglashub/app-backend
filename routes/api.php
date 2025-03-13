@@ -37,6 +37,10 @@ Route::middleware('api')->group(function () {
                 Route::get('/{id}/paradas', [$controllerClass, 'getParadas']);
                 Route::get('/{id}/viagens', [$controllerClass, 'getViagens']);
             }
+            if ($route === 'presencas') {
+                Route::get('/viagem/{viagemId}', [$controllerClass, 'getPresencasByViagem']);
+                Route::get('/aluno/{alunoId}', [$controllerClass, 'getPresencasByAluno']);
+            }
         });
     }
 });
