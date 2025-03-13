@@ -11,6 +11,7 @@ class Viagem extends Model
     protected $table = 'viagens';
     
     protected $fillable = [
+        'horario_id',
         'rota_id',
         'onibus_id',
         'motorista_id',

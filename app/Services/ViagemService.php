@@ -26,7 +26,7 @@ class ViagemService
                 'rota_id',
                 'onibus_id',
                 'motorista_id',
-                'horario_id',
+                'horario_id',  // Ensure horario_id is in the required fields list
                 'hora_saida_prevista',
                 'hora_chegada_prevista',
                 'status'

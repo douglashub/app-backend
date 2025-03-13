@@ -43,15 +43,15 @@ class ViagemController extends Controller
                 'onibus_id' => 'required|integer|exists:onibus,id',
                 'motorista_id' => 'required|integer|exists:motoristas,id',
                 'monitor_id' => 'nullable|integer|exists:monitores,id',
-                'horario_id' => 'required|integer|exists:horarios,id',
+                'horario_id' => 'required|integer|exists:horarios,id', // Make sure horario_id is required
                 'hora_saida_prevista' => 'required|date_format:H:i',
-                'hora_chegada_prevista' => 'required|date_format:H:i|after:hora_saida_prevista',
+                'hora_chegada_prevista' => 'nullable|date_format:H:i|after:hora_saida_prevista',
                 'hora_saida_real' => 'nullable|date_format:H:i',
                 'hora_chegada_real' => 'nullable|date_format:H:i',
                 'status' => 'required|boolean',
                 'observacoes' => 'nullable|string'
             ]);
-
+    
             $viagem = $this->service->createViagem($validatedData);
             $this->loggingService->logInfo('Viagem created', ['id' => $viagem->id]);
             $relationships = [
@@ -61,7 +61,7 @@ class ViagemController extends Controller
                 'monitor' => $viagem->monitor_id,
                 'horario' => $viagem->horario_id
             ];
-
+    
             return response()->json([
                 'data' => $viagem,
                 '_links' => $this->hateoasService->generateLinks('viagens', $viagem->id, $relationships)
@@ -81,7 +81,7 @@ class ViagemController extends Controller
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    
     public function show(int $id): JsonResponse
     {
         $this->loggingService->logInfo('Fetching viagem', ['id' => $id]);
