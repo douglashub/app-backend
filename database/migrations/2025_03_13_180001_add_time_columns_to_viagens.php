@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('viagens', function (Blueprint $table) {
-            $table->time('hora_chegada_prevista')->after('data_viagem');
-            $table->time('hora_saida_prevista')->after('hora_chegada_prevista');
+            $table->time('hora_chegada_prevista')->nullable()->after('data_viagem');
+            $table->time('hora_saida_prevista')->nullable()->after('hora_chegada_prevista');
         });
     }
 

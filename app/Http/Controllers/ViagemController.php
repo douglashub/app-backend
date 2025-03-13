@@ -43,7 +43,13 @@ class ViagemController extends Controller
                 'onibus_id' => 'required|integer|exists:onibus,id',
                 'motorista_id' => 'required|integer|exists:motoristas,id',
                 'monitor_id' => 'nullable|integer|exists:monitores,id',
-                'status' => 'required|boolean'
+                'horario_id' => 'required|integer|exists:horarios,id',
+                'hora_saida_prevista' => 'required|date_format:H:i',
+                'hora_chegada_prevista' => 'required|date_format:H:i|after:hora_saida_prevista',
+                'hora_saida_real' => 'nullable|date_format:H:i',
+                'hora_chegada_real' => 'nullable|date_format:H:i',
+                'status' => 'required|boolean',
+                'observacoes' => 'nullable|string'
             ]);
 
             $viagem = $this->service->createViagem($validatedData);
@@ -52,7 +58,8 @@ class ViagemController extends Controller
                 'rota' => $viagem->rota_id,
                 'onibus' => $viagem->onibus_id,
                 'motorista' => $viagem->motorista_id,
-                'monitor' => $viagem->monitor_id
+                'monitor' => $viagem->monitor_id,
+                'horario' => $viagem->horario_id
             ];
 
             return response()->json([
@@ -88,7 +95,8 @@ class ViagemController extends Controller
             'rotas' => $viagem->rota_id,
             'onibus' => $viagem->onibus_id,
             'motoristas' => $viagem->motorista_id,
-            'monitores' => $viagem->monitor_id
+            'monitores' => $viagem->monitor_id,
+            'horarios' => $viagem->horario_id
         ];
 
         $response = [
@@ -109,7 +117,13 @@ class ViagemController extends Controller
                 'onibus_id' => 'sometimes|integer|exists:onibus,id',
                 'motorista_id' => 'sometimes|integer|exists:motoristas,id',
                 'monitor_id' => 'nullable|integer|exists:monitores,id',
-                'status' => 'sometimes|boolean'
+                'horario_id' => 'sometimes|integer|exists:horarios,id',
+                'hora_saida_prevista' => 'sometimes|date_format:H:i',
+                'hora_chegada_prevista' => 'sometimes|date_format:H:i|after:hora_saida_prevista',
+                'hora_saida_real' => 'nullable|date_format:H:i',
+                'hora_chegada_real' => 'nullable|date_format:H:i',
+                'status' => 'sometimes|boolean',
+                'observacoes' => 'nullable|string'
             ]);
 
             $viagem = $this->service->updateViagem($id, $validatedData);
@@ -127,7 +141,8 @@ class ViagemController extends Controller
                 'rotas' => $viagem->rota_id,
                 'onibus' => $viagem->onibus_id,
                 'motoristas' => $viagem->motorista_id,
-                'monitores' => $viagem->monitor_id
+                'monitores' => $viagem->monitor_id,
+                'horarios' => $viagem->horario_id
             ];
             
             return response()->json([

@@ -20,6 +20,24 @@ class ViagemService
     public function createViagem(array $data): Viagem
     {
         try {
+            // Make sure all required fields are included
+            $requiredFields = [
+                'data_viagem',
+                'rota_id',
+                'onibus_id',
+                'motorista_id',
+                'horario_id',
+                'hora_saida_prevista',
+                'hora_chegada_prevista',
+                'status'
+            ];
+            
+            foreach ($requiredFields as $field) {
+                if (!isset($data[$field])) {
+                    throw new \InvalidArgumentException("Missing required field: {$field}");
+                }
+            }
+            
             return Viagem::create($data);
         } catch (\Exception $e) {
             throw new \RuntimeException('Failed to create viagem: ' . $e->getMessage());
