@@ -1,0 +1,780 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "School Bus Management API",
+        "description": "API for managing school bus operations including trips, routes, and attendance",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/paradas": {
+            "get": {
+                "tags": [
+                    "Paradas"
+                ],
+                "summary": "List all bus stops",
+                "operationId": "376c9d381cdd3da2c96a69051d2f49f3",
+                "responses": {
+                    "200": {
+                        "description": "List of bus stops",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "nome": {
+                                                        "type": "string"
+                                                    },
+                                                    "descricao": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "latitude": {
+                                                        "type": "number",
+                                                        "format": "float"
+                                                    },
+                                                    "longitude": {
+                                                        "type": "number",
+                                                        "format": "float"
+                                                    },
+                                                    "endereco": {
+                                                        "type": "string"
+                                                    },
+                                                    "ponto_referencia": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "status": {
+                                                        "type": "boolean"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Paradas"
+                ],
+                "summary": "Create a new bus stop",
+                "operationId": "a1ef6cee84e6bac8cdad1e7fd9d46a1f",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nome",
+                                    "latitude",
+                                    "longitude",
+                                    "endereco",
+                                    "status"
+                                ],
+                                "properties": {
+                                    "nome": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "descricao": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "latitude": {
+                                        "type": "number",
+                                        "format": "float"
+                                    },
+                                    "longitude": {
+                                        "type": "number",
+                                        "format": "float"
+                                    },
+                                    "endereco": {
+                                        "type": "string"
+                                    },
+                                    "ponto_referencia": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "status": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bus stop created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "nome": {
+                                                    "type": "string"
+                                                },
+                                                "descricao": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "latitude": {
+                                                    "type": "number",
+                                                    "format": "float"
+                                                },
+                                                "longitude": {
+                                                    "type": "number",
+                                                    "format": "float"
+                                                },
+                                                "endereco": {
+                                                    "type": "string"
+                                                },
+                                                "ponto_referencia": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "status": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/api/paradas/{id}": {
+            "get": {
+                "tags": [
+                    "Paradas"
+                ],
+                "summary": "Get a specific bus stop",
+                "operationId": "f9b661363df51db386c17a98d018af1a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Bus stop ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bus stop details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "nome": {
+                                                    "type": "string"
+                                                },
+                                                "descricao": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "latitude": {
+                                                    "type": "number",
+                                                    "format": "float"
+                                                },
+                                                "longitude": {
+                                                    "type": "number",
+                                                    "format": "float"
+                                                },
+                                                "endereco": {
+                                                    "type": "string"
+                                                },
+                                                "ponto_referencia": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "status": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Bus stop not found"
+                    }
+                }
+            }
+        },
+        "/api/presencas": {
+            "get": {
+                "tags": [
+                    "Presencas"
+                ],
+                "summary": "List all attendances",
+                "operationId": "c3274bab9e92710516ec9cbb6ac62e7b",
+                "responses": {
+                    "200": {
+                        "description": "List of attendances",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "aluno_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "viagem_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "presente": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "data": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/presencas/{id}": {
+            "get": {
+                "tags": [
+                    "Presencas"
+                ],
+                "summary": "Get a specific attendance record",
+                "operationId": "7416b14b9e1bae3d83614da4cad06c47",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Attendance ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attendance details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "aluno_id": {
+                                                    "type": "integer"
+                                                },
+                                                "viagem_id": {
+                                                    "type": "integer"
+                                                },
+                                                "presente": {
+                                                    "type": "boolean"
+                                                },
+                                                "data": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Attendance record not found"
+                    }
+                }
+            }
+        },
+        "/api/viagens": {
+            "get": {
+                "tags": [
+                    "Viagens"
+                ],
+                "summary": "List all trips",
+                "operationId": "3844a9e3fceb378fc4f9a88881efe30e",
+                "responses": {
+                    "200": {
+                        "description": "List of trips",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "rota_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "motorista_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "monitor_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "onibus_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "horario_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "data": {
+                                                        "type": "string",
+                                                        "format": "date"
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "agendada",
+                                                            "em_andamento",
+                                                            "concluida",
+                                                            "cancelada"
+                                                        ]
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Viagens"
+                ],
+                "summary": "Create a new trip",
+                "operationId": "3db3ad95c027fb17c5e7ac8a12124c4d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "rota_id",
+                                    "motorista_id",
+                                    "monitor_id",
+                                    "onibus_id",
+                                    "horario_id",
+                                    "data",
+                                    "status"
+                                ],
+                                "properties": {
+                                    "rota_id": {
+                                        "type": "integer"
+                                    },
+                                    "motorista_id": {
+                                        "type": "integer"
+                                    },
+                                    "monitor_id": {
+                                        "type": "integer"
+                                    },
+                                    "onibus_id": {
+                                        "type": "integer"
+                                    },
+                                    "horario_id": {
+                                        "type": "integer"
+                                    },
+                                    "data": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "agendada",
+                                            "em_andamento",
+                                            "concluida",
+                                            "cancelada"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Trip created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "rota_id": {
+                                                    "type": "integer"
+                                                },
+                                                "motorista_id": {
+                                                    "type": "integer"
+                                                },
+                                                "monitor_id": {
+                                                    "type": "integer"
+                                                },
+                                                "onibus_id": {
+                                                    "type": "integer"
+                                                },
+                                                "horario_id": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "string",
+                                                    "format": "date"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "agendada",
+                                                        "em_andamento",
+                                                        "concluida",
+                                                        "cancelada"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/api/viagens/{id}": {
+            "get": {
+                "tags": [
+                    "Viagens"
+                ],
+                "summary": "Get a specific trip",
+                "operationId": "0893c66516300c8e46c968cccbc22bb2",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Trip ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Trip details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "rota_id": {
+                                                    "type": "integer"
+                                                },
+                                                "motorista_id": {
+                                                    "type": "integer"
+                                                },
+                                                "monitor_id": {
+                                                    "type": "integer"
+                                                },
+                                                "onibus_id": {
+                                                    "type": "integer"
+                                                },
+                                                "horario_id": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "string",
+                                                    "format": "date"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "agendada",
+                                                        "em_andamento",
+                                                        "concluida",
+                                                        "cancelada"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Trip not found"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Viagens"
+                ],
+                "summary": "Update a trip",
+                "operationId": "d8b22f8f7f5559dbb105ace8191dd130",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Trip ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "rota_id",
+                                    "motorista_id",
+                                    "monitor_id",
+                                    "onibus_id",
+                                    "horario_id",
+                                    "data",
+                                    "status"
+                                ],
+                                "properties": {
+                                    "rota_id": {
+                                        "type": "integer"
+                                    },
+                                    "motorista_id": {
+                                        "type": "integer"
+                                    },
+                                    "monitor_id": {
+                                        "type": "integer"
+                                    },
+                                    "onibus_id": {
+                                        "type": "integer"
+                                    },
+                                    "horario_id": {
+                                        "type": "integer"
+                                    },
+                                    "data": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "agendada",
+                                            "em_andamento",
+                                            "concluida",
+                                            "cancelada"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Trip updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "rota_id": {
+                                                    "type": "integer"
+                                                },
+                                                "motorista_id": {
+                                                    "type": "integer"
+                                                },
+                                                "monitor_id": {
+                                                    "type": "integer"
+                                                },
+                                                "onibus_id": {
+                                                    "type": "integer"
+                                                },
+                                                "horario_id": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "string",
+                                                    "format": "date"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "agendada",
+                                                        "em_andamento",
+                                                        "concluida",
+                                                        "cancelada"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "_links": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Trip not found"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Viagens"
+                ],
+                "summary": "Delete a trip",
+                "operationId": "cf02ae69b9aa816dc430660f136faa71",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Trip ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Trip deleted successfully"
+                    },
+                    "404": {
+                        "description": "Trip not found"
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Paradas",
+            "description": "API Endpoints for bus stops management"
+        },
+        {
+            "name": "Presencas",
+            "description": "API Endpoints for attendance management"
+        },
+        {
+            "name": "Viagens",
+            "description": "API Endpoints for trip management"
+        }
+    ]
+}

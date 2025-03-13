@@ -1,0 +1,157 @@
+{
+  "info": {
+    "name": "School Transport API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Alunos",
+      "item": [
+        {
+          "name": "Create Aluno",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Silva\",\n  \"data_nascimento\": \"2015-03-15\",\n  \"responsavel\": \"João Silva\",\n  \"telefone_responsavel\": \"+5511999999999\",\n  \"endereco\": \"Rua das Flores, 123\",\n  \"status\": true\n}"
+            },
+            "url": "{{base_url}}/alunos"
+          }
+        },
+        {
+          "name": "Get All Alunos",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/alunos"
+          }
+        },
+        {
+          "name": "Update Aluno",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefone_responsavel\": \"+5511988888888\"\n}"
+            },
+            "url": "{{base_url}}/alunos/1"
+          }
+        },
+        {
+          "name": "Delete Aluno",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/alunos/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Viagens",
+      "item": [
+        {
+          "name": "Create Viagem",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rota_id\": 1,\n  \"onibus_id\": 1,\n  \"motorista_id\": 1,\n  \"data_viagem\": \"2024-03-20\",\n  \"hora_saida\": \"07:00:00\"\n}"
+            },
+            "url": "{{base_url}}/viagens"
+          }
+        },
+        {
+          "name": "Get All Viagens",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/viagens"
+          }
+        },
+        {
+          "name": "Get Viagem",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/viagens/1"
+          }
+        },
+        {
+          "name": "Update Viagem",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hora_saida\": \"07:30:00\"\n}"
+            },
+            "url": "{{base_url}}/viagens/1"
+          }
+        },
+        {
+          "name": "Delete Viagem",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/viagens/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Onibus",
+      "item": [
+        {
+          "name": "Create Onibus",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"placa\": \"ABC1D23\",\n  \"modelo\": \"Mercedes Benz O500U\",\n  \"capacidade\": 40,\n  \"ano\": 2022,\n  \"status\": true\n}"
+            },
+            "url": "{{base_url}}/onibus"
+          }
+        },
+        {
+          "name": "Get All Onibus",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/onibus"
+          }
+        },
+        {
+          "name": "Get Onibus",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/onibus/1"
+          }
+        },
+        {
+          "name": "Update Onibus",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"capacidade\": 45\n}"
+            },
+            "url": "{{base_url}}/onibus/1"
+          }
+        },
+        {
+          "name": "Delete Onibus",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/onibus/1"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api"
+    }
+  ]
+}
