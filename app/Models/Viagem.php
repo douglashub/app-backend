@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Viagem extends Model
 {
-    // Set the fillable attributes for mass assignment
+    protected $table = 'viagens';
+    
     protected $fillable = [
         'rota_id',
         'onibus_id',

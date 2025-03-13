@@ -28,7 +28,7 @@ class Rota extends Model
 
     public function viagens(): HasMany
     {
-        return $this->hasMany(Viagem::class);
+        return $this->hasMany(Viagem::class, 'rota_id');
     }
 
     public function subrotas(): BelongsToMany
