@@ -1,0 +1,26 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('onibus', function (Blueprint $table) {
+            $table->id(); // Standard Laravel auto-increment id
+            $table->string('placa', 10)->unique();
+            $table->integer('capacidade');
+            $table->string('modelo', 50);
+            $table->integer('ano_fabricacao');
+            $table->string('status', 20);
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('onibus');
+    }
+};
