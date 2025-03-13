@@ -4,12 +4,13 @@ namespace App\Services;
 
 use App\Models\Horario;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class HorarioService
 {
-    public function getAllHorarios(): Collection
+    public function getAllHorarios(int $perPage = 10): LengthAwarePaginator
     {
-        return Horario::all();
+        return Horario::paginate($perPage);
     }
 
     public function getHorarioById(int $id): ?Horario

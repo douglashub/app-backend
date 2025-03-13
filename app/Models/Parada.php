@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Parada extends Model
 {
@@ -12,6 +13,14 @@ class Parada extends Model
         'ponto_referencia',
         'latitude',
         'longitude',
-        'tipo'
+        'tipo',
+        'status'
     ];
+    
+    public function rotas(): BelongsToMany
+    {
+        return $this->belongsToMany(Rota::class, 'rota_parada')
+                    ->withPivot('ordem', 'horario_estimado')
+                    ->withTimestamps();
+    }
 }

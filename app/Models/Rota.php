@@ -33,4 +33,11 @@ class Rota extends Model
             ->withPivot('ordem')
             ->withTimestamps();
     }
+    
+    public function paradas(): BelongsToMany
+    {
+        return $this->belongsToMany(Parada::class, 'rota_parada')
+            ->withPivot('ordem', 'horario_estimado')
+            ->withTimestamps();
+    }
 }

@@ -42,7 +42,7 @@ class ViagemController extends Controller
                 'rota_id' => 'required|integer|exists:rotas,id',
                 'onibus_id' => 'required|integer|exists:onibus,id',
                 'motorista_id' => 'required|integer|exists:motoristas,id',
-                'monitor_id' => 'required|integer|exists:monitores,id',
+                'monitor_id' => 'nullable|integer|exists:monitores,id',
                 'status' => 'required|boolean'
             ]);
 
@@ -75,7 +75,6 @@ class ViagemController extends Controller
         }
     }
 
-    // Add similar logging to show, update and destroy methods
     public function show(int $id): JsonResponse
     {
         $this->loggingService->logInfo('Fetching viagem', ['id' => $id]);
@@ -103,13 +102,14 @@ class ViagemController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         try {
+            $this->loggingService->logInfo('Updating viagem', ['id' => $id]);
             $validatedData = $request->validate([
-                'data_viagem' => 'required|date',
-                'rota_id' => 'required|integer|exists:rotas,id',
-                'onibus_id' => 'required|integer|exists:onibus,id',
-                'motorista_id' => 'required|integer|exists:motoristas,id',
-                'monitor_id' => 'required|integer|exists:monitores,id',
-                'status' => 'required|boolean'
+                'data_viagem' => 'sometimes|date',
+                'rota_id' => 'sometimes|integer|exists:rotas,id',
+                'onibus_id' => 'sometimes|integer|exists:onibus,id',
+                'motorista_id' => 'sometimes|integer|exists:motoristas,id',
+                'monitor_id' => 'nullable|integer|exists:monitores,id',
+                'status' => 'sometimes|boolean'
             ]);
 
             $viagem = $this->service->updateViagem($id, $validatedData);
@@ -122,7 +122,18 @@ class ViagemController extends Controller
             }
 
             $this->loggingService->logInfo('Viagem updated successfully', ['id' => $id]);
-            return response()->json($viagem);
+            
+            $relationships = [
+                'rotas' => $viagem->rota_id,
+                'onibus' => $viagem->onibus_id,
+                'motoristas' => $viagem->motorista_id,
+                'monitores' => $viagem->monitor_id
+            ];
+            
+            return response()->json([
+                'data' => $viagem,
+                '_links' => $this->hateoasService->generateLinks('viagens', $id, $relationships)
+            ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $this->loggingService->logError('Validation error: ' . $e->getMessage());
             return response()->json([
@@ -142,6 +153,7 @@ class ViagemController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
+            $this->loggingService->logInfo('Deleting viagem', ['id' => $id]);
             $deleted = $this->service->deleteViagem($id);
             if (!$deleted) {
                 $this->loggingService->logError('Viagem deletion failed', ['id' => $id]);
