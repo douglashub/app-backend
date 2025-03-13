@@ -53,57 +53,112 @@ class ParadaController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $validatedData = $request->validate([
-            'nome' => 'required|string|max:255',
-            'descricao' => 'nullable|string',
-            'ponto_referencia' => 'nullable|string',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'endereco' => 'required|string',
-            'status' => 'required|boolean'
-        ]);
+        try {
+            $this->loggingService->logInfo('Creating new parada');
+            $validatedData = $request->validate([
+                'nome' => 'required|string|max:255',
+                'descricao' => 'nullable|string',
+                'ponto_referencia' => 'nullable|string',
+                'latitude' => 'required|numeric',
+                'longitude' => 'required|numeric',
+                'endereco' => 'required|string',
+                'tipo' => 'required|in:Inicio,Intermediaria,Final',
+                'status' => 'required|boolean'
+            ]);
 
-        $parada = $this->paradaService->createParada($validatedData);
-        $response = [
-            'data' => $parada,
-            '_links' => $this->hateoasService->generateLinks('paradas', $parada->id)
-        ];
+            $parada = $this->paradaService->createParada($validatedData);
+            $this->loggingService->logInfo('Parada created', ['id' => $parada->id]);
 
-        return response()->json($response, Response::HTTP_CREATED);
+            $response = [
+                'data' => $parada,
+                '_links' => $this->hateoasService->generateLinks('paradas', $parada->id)
+            ];
+
+            return response()->json($response, Response::HTTP_CREATED);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->loggingService->logError('Validation failed: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $e->errors(),
+                '_links' => $this->hateoasService->generateCollectionLinks('paradas')
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (\Exception $e) {
+            $this->loggingService->logError('Server error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Server error',
+                '_links' => $this->hateoasService->generateCollectionLinks('paradas')
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $validatedData = $request->validate([
-            'nome' => 'sometimes|string|max:255',
-            'descricao' => 'nullable|string',
-            'ponto_referencia' => 'nullable|string',
-            'latitude' => 'sometimes|numeric',
-            'longitude' => 'sometimes|numeric',
-            'endereco' => 'sometimes|string',
-            'status' => 'sometimes|boolean'
-        ]);
+        try {
+            $this->loggingService->logInfo('Updating parada', ['id' => $id]);
+            $validatedData = $request->validate([
+                'nome' => 'sometimes|string|max:255',
+                'descricao' => 'nullable|string',
+                'ponto_referencia' => 'nullable|string',
+                'latitude' => 'sometimes|numeric',
+                'longitude' => 'sometimes|numeric',
+                'endereco' => 'sometimes|string',
+                'tipo' => 'sometimes|in:Inicio,Intermediaria,Final',
+                'status' => 'sometimes|boolean'
+            ]);
 
-        $parada = $this->paradaService->updateParada($id, $validatedData);
-        if (!$parada) {
-            return response()->json(['message' => 'Parada não encontrada'], Response::HTTP_NOT_FOUND);
+            $parada = $this->paradaService->updateParada($id, $validatedData);
+            if (!$parada) {
+                $this->loggingService->logError('Parada update failed', ['id' => $id]);
+                return response()->json([
+                    'message' => 'Parada não encontrada',
+                    '_links' => $this->hateoasService->generateCollectionLinks('paradas')
+                ], Response::HTTP_NOT_FOUND);
+            }
+
+            $this->loggingService->logInfo('Parada updated successfully', ['id' => $id]);
+            $response = [
+                'data' => $parada,
+                '_links' => $this->hateoasService->generateLinks('paradas', $id)
+            ];
+
+            return response()->json($response);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->loggingService->logError('Validation error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $e->errors(),
+                '_links' => $this->hateoasService->generateCollectionLinks('paradas')
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (\Exception $e) {
+            $this->loggingService->logError('Server error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Server error',
+                '_links' => $this->hateoasService->generateCollectionLinks('paradas')
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-
-        $response = [
-            'data' => $parada,
-            '_links' => $this->hateoasService->generateLinks('paradas', $id)
-        ];
-
-        return response()->json($response);
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $result = $this->paradaService->deleteParada($id);
-        if (!$result) {
-            return response()->json(['message' => 'Parada não encontrada'], Response::HTTP_NOT_FOUND);
-        }
+        try {
+            $this->loggingService->logInfo('Deleting parada', ['id' => $id]);
+            $result = $this->paradaService->deleteParada($id);
+            if (!$result) {
+                $this->loggingService->logError('Parada deletion failed', ['id' => $id]);
+                return response()->json([
+                    'message' => 'Parada não encontrada',
+                    '_links' => $this->hateoasService->generateCollectionLinks('paradas')
+                ], Response::HTTP_NOT_FOUND);
+            }
 
-        return response()->json(null, Response::HTTP_NO_CONTENT);
+            $this->loggingService->logInfo('Parada deleted successfully', ['id' => $id]);
+            return response()->json(null, Response::HTTP_NO_CONTENT);
+        } catch (\Exception $e) {
+            $this->loggingService->logError('Deletion error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Server error',
+                '_links' => $this->hateoasService->generateCollectionLinks('paradas')
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }

@@ -4,12 +4,13 @@ namespace App\Services;
 
 use App\Models\Monitor;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class MonitorService
 {
-    public function getAllMonitores(): Collection
+    public function getAllMonitores(int $perPage = 10): LengthAwarePaginator
     {
-        return Monitor::all();
+        return Monitor::paginate($perPage);
     }
 
     public function getMonitorById(int $id): ?Monitor

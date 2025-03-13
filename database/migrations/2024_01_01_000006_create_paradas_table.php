@@ -16,6 +16,7 @@ return new class extends Migration
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
             $table->enum('tipo', ['Inicio', 'Intermediaria', 'Final']);
+            $table->boolean('status')->default(true);
             $table->timestamps();
         });
     }

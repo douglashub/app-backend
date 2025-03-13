@@ -4,12 +4,13 @@ namespace App\Services;
 
 use App\Models\Aluno;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class AlunoService
 {
-    public function getAllAlunos(): Collection
+    public function getAllAlunos(int $perPage = 10): LengthAwarePaginator
     {
-        return Aluno::all();
+        return Aluno::paginate($perPage);
     }
 
     public function getAlunoById(int $id): ?Aluno

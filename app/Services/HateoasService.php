@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Pagination\LengthAwarePaginator;
+
 class HateoasService
 {
     public function generateLinks(string $resourceType, int $id, array $relationships = []): array
@@ -19,6 +21,12 @@ class HateoasService
                 'href' => url("/api/{$resourceType}/{$id}"),
                 'method' => 'DELETE'
             ]
+        ];
+
+        // Add collection link
+        $links['collection'] = [
+            'href' => url("/api/{$resourceType}"),
+            'method' => 'GET'
         ];
 
         foreach ($relationships as $relation => $ids) {
@@ -40,7 +48,7 @@ class HateoasService
         return $links;
     }
 
-    public function generateCollectionLinks(string $resourceType, ?array $pagination = null): array
+    public function generateCollectionLinks(string $resourceType, ?LengthAwarePaginator $paginator = null): array
     {
         $links = [
             'self' => [
@@ -53,19 +61,30 @@ class HateoasService
             ]
         ];
 
-        if ($pagination) {
-            if (isset($pagination['next_page_url'])) {
+        if ($paginator) {
+            if ($paginator->hasMorePages()) {
                 $links['next'] = [
-                    'href' => $pagination['next_page_url'],
+                    'href' => $paginator->nextPageUrl(),
                     'method' => 'GET'
                 ];
             }
-            if (isset($pagination['prev_page_url'])) {
+            
+            if ($paginator->currentPage() > 1) {
                 $links['prev'] = [
-                    'href' => $pagination['prev_page_url'],
+                    'href' => $paginator->previousPageUrl(),
                     'method' => 'GET'
                 ];
             }
+            
+            $links['first'] = [
+                'href' => $paginator->url(1),
+                'method' => 'GET'
+            ];
+            
+            $links['last'] = [
+                'href' => $paginator->url($paginator->lastPage()),
+                'method' => 'GET'
+            ];
         }
 
         return $links;
