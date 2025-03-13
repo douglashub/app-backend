@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('horarios', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('rota_id')->constrained('rotas');
+            $table->foreignId('rota_id')->constrained()->onDelete('cascade');
             $table->time('hora_saida');
             $table->time('hora_chegada');
             $table->json('dias_semana');
