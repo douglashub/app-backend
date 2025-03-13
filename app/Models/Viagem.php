@@ -16,6 +16,8 @@ class Viagem extends Model
         'motorista_id',
         'monitor_id',
         'data_viagem',
+        'hora_saida_prevista',
+        'hora_chegada_prevista',
         'hora_saida_real',
         'hora_chegada_real',
         'observacoes',
