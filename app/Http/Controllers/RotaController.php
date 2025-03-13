@@ -57,16 +57,19 @@ class RotaController extends Controller
             $validatedData = $request->validate([
                 'nome' => 'required|string|max:255',
                 'descricao' => 'nullable|string',
-                'origem' => 'required|string|max:255',
-                'destino' => 'required|string|max:255',
-                'horario_inicio' => 'required|date_format:H:i',
-                'horario_fim' => 'required|date_format:H:i|after:horario_inicio',
-                'status' => 'required|boolean'
+                'origem' => 'nullable|string|max:255',
+                'destino' => 'nullable|string|max:255',
+                'horario_inicio' => 'nullable|date_format:H:i',
+                'horario_fim' => 'nullable|date_format:H:i|after_or_equal:horario_inicio',
+                'tipo' => 'nullable|string|max:50',
+                'distancia_km' => 'nullable|numeric',
+                'tempo_estimado_minutos' => 'nullable|integer',
+                'status' => 'sometimes|boolean'
             ]);
-
+    
             $rota = $this->service->createRota($validatedData);
             $this->loggingService->logInfo('Rota created', ['id' => $rota->id]);
-
+    
             return response()->json([
                 'data' => $rota,
                 '_links' => $this->hateoasService->generateLinks('rotas', $rota->id)
@@ -86,7 +89,7 @@ class RotaController extends Controller
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
+    
     public function update(Request $request, int $id): JsonResponse
     {
         try {

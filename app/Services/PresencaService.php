@@ -59,7 +59,7 @@ class PresencaService
                 $presencaData = [
                     'viagem_id' => $data['viagem_id'],
                     'aluno_id' => $data['aluno_id'],
-                    'hora_registro' => $data['hora_registro'],
+                    'hora_embarque' => $data['hora_embarque'],
                     'presente' => $data['presente'],
                     'observacoes' => $data['observacoes'] ?? null
                 ];

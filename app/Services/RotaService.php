@@ -19,6 +19,10 @@ class RotaService
 
     public function createRota(array $data): Rota
     {
+        // Set default values if not provided
+        $data['tipo'] = $data['tipo'] ?? '';
+        $data['status'] = $data['status'] ?? true;
+    
         return Rota::create($data);
     }
 

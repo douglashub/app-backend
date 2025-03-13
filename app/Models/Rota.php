@@ -12,8 +12,12 @@ class Rota extends Model
         'nome',
         'descricao',
         'tipo',
-        'distancia',
-        'tempo_estimado',
+        'distancia_km',
+        'tempo_estimado_minutos',
+        'origem',
+        'destino',
+        'horario_inicio',
+        'horario_fim',
         'status'
     ];
 
