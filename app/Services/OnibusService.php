@@ -19,7 +19,26 @@ class OnibusService
 
     public function createOnibus(array $data): Onibus
     {
-        return Onibus::create($data);
+        try {
+            // Certifique-se de que todos os campos obrigatórios estão presentes
+            $requiredFields = [
+                'placa',
+                'modelo',
+                'capacidade',
+                'ano_fabricacao',
+                'status'
+            ];
+            
+            foreach ($requiredFields as $field) {
+                if (!isset($data[$field])) {
+                    throw new \InvalidArgumentException("Campo obrigatório ausente: {$field}");
+                }
+            }
+            
+            return Onibus::create($data);
+        } catch (\Exception $e) {
+            throw new \RuntimeException('Falha ao criar ônibus: ' . $e->getMessage());
+        }
     }
 
     public function updateOnibus(int $id, array $data): ?Onibus
@@ -29,8 +48,12 @@ class OnibusService
             return null;
         }
 
-        $onibus->update($data);
-        return $onibus->fresh();
+        try {
+            $onibus->update($data);
+            return $onibus->fresh();
+        } catch (\Exception $e) {
+            throw new \RuntimeException('Falha ao atualizar ônibus: ' . $e->getMessage());
+        }
     }
 
     public function deleteOnibus(int $id): bool

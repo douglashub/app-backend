@@ -54,6 +54,10 @@ class RotaController extends Controller
     {
         try {
             $this->loggingService->logInfo('Creating new rota');
+            
+            // Formatar campos de hora antes da validação
+            $this->formatTimeFields($request);
+            
             $validatedData = $request->validate([
                 'nome' => 'required|string|max:255',
                 'descricao' => 'nullable|string',
@@ -94,6 +98,10 @@ class RotaController extends Controller
     {
         try {
             $this->loggingService->logInfo('Updating rota', ['id' => $id]);
+            
+            // Formatar campos de hora antes da validação
+            $this->formatTimeFields($request);
+            
             $validatedData = $request->validate([
                 'nome' => 'sometimes|string|max:255',
                 'descricao' => 'nullable|string',
@@ -188,5 +196,31 @@ class RotaController extends Controller
             'data' => $viagens,
             '_links' => $this->hateoasService->generateLinks('rotas', $id)
         ]);
+    }
+    
+    /**
+     * Formata os campos de hora para garantir que estejam no padrão H:i
+     * 
+     * @param Request $request
+     * @return void
+     */
+    private function formatTimeFields(Request $request): void
+    {
+        $timeFields = [
+            'horario_inicio',
+            'horario_fim'
+        ];
+        
+        foreach ($timeFields as $field) {
+            if ($request->has($field) && $request->input($field)) {
+                $time = $request->input($field);
+                // Verifica se o formato precisa ser ajustado (se tem apenas um dígito para hora)
+                if (preg_match('/^(\d{1}):(\d{2})$/', $time, $matches)) {
+                    $hours = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+                    $request->merge([$field => "{$hours}:{$matches[2]}"]);
+                    $this->loggingService->logInfo("Formatted time field {$field} from {$time} to {$hours}:{$matches[2]}");
+                }
+            }
+        }
     }
 }

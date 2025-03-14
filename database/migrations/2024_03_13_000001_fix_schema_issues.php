@@ -23,9 +23,21 @@ return new class extends Migration
                 if (Schema::hasColumn('horarios', 'hora_chegada') && !Schema::hasColumn('horarios', 'hora_fim')) {
                     $table->renameColumn('hora_chegada', 'hora_fim');
                 }
+                // Adicionar hora_inicio se não existir
+                if (!Schema::hasColumn('horarios', 'hora_inicio') && !Schema::hasColumn('horarios', 'hora_saida')) {
+                    $table->time('hora_inicio');
+                }
+                // Adicionar hora_fim se não existir
+                if (!Schema::hasColumn('horarios', 'hora_fim') && !Schema::hasColumn('horarios', 'hora_chegada')) {
+                    $table->time('hora_fim');
+                }
                 // Rename ativo to status if needed
                 if (Schema::hasColumn('horarios', 'ativo') && !Schema::hasColumn('horarios', 'status')) {
                     $table->renameColumn('ativo', 'status');
+                }
+                // Adicionar status se não existir
+                if (!Schema::hasColumn('horarios', 'status') && !Schema::hasColumn('horarios', 'ativo')) {
+                    $table->boolean('status')->default(true);
                 }
             });
         }

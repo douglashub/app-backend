@@ -6,7 +6,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
-class ViagemSeeder extends Seeder
+class ViagemSeeder extends Seeder // Aqui estava incorreto como HorarioSeeder
 {
     public function run(): void
     {
@@ -25,7 +25,7 @@ class ViagemSeeder extends Seeder
                 'onibus_id' => 1,
                 'motorista_id' => 1,
                 'monitor_id' => 1,
-                'horario_id' => 1,
+                'horario_id' => 1, // Ensure this matches an existing horario in the horarios table
                 'hora_saida_prevista' => '07:00',
                 'hora_chegada_prevista' => '07:45',
                 'hora_saida_real' => '07:05',
@@ -41,7 +41,7 @@ class ViagemSeeder extends Seeder
                 'onibus_id' => 2,
                 'motorista_id' => 2,
                 'monitor_id' => 2,
-                'horario_id' => 3,
+                'horario_id' => 3, // Ensure this matches an existing horario in the horarios table
                 'hora_saida_prevista' => '06:45',
                 'hora_chegada_prevista' => '07:30',
                 'hora_saida_real' => '06:50',
@@ -57,7 +57,7 @@ class ViagemSeeder extends Seeder
                 'onibus_id' => 1,
                 'motorista_id' => 1,
                 'monitor_id' => 1,
-                'horario_id' => 1,
+                'horario_id' => 1, // Ensure this matches an existing horario in the horarios table
                 'hora_saida_prevista' => '07:00',
                 'hora_chegada_prevista' => '07:45',
                 'hora_saida_real' => null,
@@ -73,7 +73,7 @@ class ViagemSeeder extends Seeder
                 'onibus_id' => 3,
                 'motorista_id' => 3,
                 'monitor_id' => 3,
-                'horario_id' => 4,
+                'horario_id' => 4, // Ensure this matches an existing horario in the horarios table
                 'hora_saida_prevista' => '06:30',
                 'hora_chegada_prevista' => '07:15',
                 'hora_saida_real' => null,

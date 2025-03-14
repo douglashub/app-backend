@@ -41,6 +41,7 @@ class OnibusController extends Controller
                 'placa' => 'required|string|max:10',
                 'modelo' => 'required|string|max:255',
                 'capacidade' => 'required|integer',
+                'ano_fabricacao' => 'required|integer',
                 'status' => 'required|boolean'
             ]);
 
@@ -62,6 +63,7 @@ class OnibusController extends Controller
             $this->loggingService->logError('Server error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Server error',
+                'error_details' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('onibus')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -92,6 +94,7 @@ class OnibusController extends Controller
                 'placa' => 'sometimes|string|max:10',
                 'modelo' => 'sometimes|string|max:255',
                 'capacidade' => 'sometimes|integer',
+                'ano_fabricacao' => 'sometimes|integer',
                 'status' => 'sometimes|boolean'
             ]);
 
@@ -120,6 +123,7 @@ class OnibusController extends Controller
             $this->loggingService->logError('Server error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Server error',
+                'error_details' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('onibus')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -144,6 +148,7 @@ class OnibusController extends Controller
             $this->loggingService->logError('Deletion error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Server error',
+                'error_details' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('onibus')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
