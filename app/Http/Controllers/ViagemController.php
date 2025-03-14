@@ -37,13 +37,17 @@ class ViagemController extends Controller
     {
         try {
             $this->loggingService->logInfo('Creating new viagem');
+            
+            // Formatar campos de hora antes da validação
+            $this->formatTimeFields($request);
+            
             $validatedData = $request->validate([
                 'data_viagem' => 'required|date',
                 'rota_id' => 'required|integer|exists:rotas,id',
                 'onibus_id' => 'required|integer|exists:onibus,id',
                 'motorista_id' => 'required|integer|exists:motoristas,id',
                 'monitor_id' => 'nullable|integer|exists:monitores,id',
-                'horario_id' => 'required|integer|exists:horarios,id', // Make sure horario_id is required
+                'horario_id' => 'required|integer|exists:horarios,id',
                 'hora_saida_prevista' => 'required|date_format:H:i',
                 'hora_chegada_prevista' => 'nullable|date_format:H:i|after:hora_saida_prevista',
                 'hora_saida_real' => 'nullable|date_format:H:i',
@@ -111,6 +115,10 @@ class ViagemController extends Controller
     {
         try {
             $this->loggingService->logInfo('Updating viagem', ['id' => $id]);
+            
+            // Formatar campos de hora antes da validação
+            $this->formatTimeFields($request);
+            
             $validatedData = $request->validate([
                 'data_viagem' => 'sometimes|date',
                 'rota_id' => 'sometimes|integer|exists:rotas,id',
@@ -118,14 +126,17 @@ class ViagemController extends Controller
                 'motorista_id' => 'sometimes|integer|exists:motoristas,id',
                 'monitor_id' => 'nullable|integer|exists:monitores,id',
                 'horario_id' => 'sometimes|integer|exists:horarios,id',
-                'hora_saida_prevista' => 'sometimes|date_format:H:i',
-                'hora_chegada_prevista' => 'sometimes|date_format:H:i|after:hora_saida_prevista',
+                
+                // Modificar validação de campos de hora
+                'hora_saida_prevista' => 'nullable|date_format:H:i',
+                'hora_chegada_prevista' => 'nullable|date_format:H:i',
                 'hora_saida_real' => 'nullable|date_format:H:i',
                 'hora_chegada_real' => 'nullable|date_format:H:i',
+                
                 'status' => 'sometimes|boolean',
                 'observacoes' => 'nullable|string'
             ]);
-
+    
             $viagem = $this->service->updateViagem($id, $validatedData);
             if (!$viagem) {
                 $this->loggingService->logError('Viagem update failed', ['id' => $id]);
@@ -134,7 +145,7 @@ class ViagemController extends Controller
                     '_links' => $this->hateoasService->generateCollectionLinks('viagens')
                 ], Response::HTTP_NOT_FOUND);
             }
-
+    
             $this->loggingService->logInfo('Viagem updated successfully', ['id' => $id]);
             
             $relationships = [
@@ -186,6 +197,34 @@ class ViagemController extends Controller
                 'message' => 'Server error',
                 '_links' => $this->hateoasService->generateCollectionLinks('viagens')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    /**
+     * Formata os campos de hora para garantir que estejam no padrão H:i
+     * 
+     * @param Request $request
+     * @return void
+     */
+    private function formatTimeFields(Request $request): void
+    {
+        $timeFields = [
+            'hora_saida_prevista',
+            'hora_chegada_prevista',
+            'hora_saida_real',
+            'hora_chegada_real'
+        ];
+        
+        foreach ($timeFields as $field) {
+            if ($request->has($field) && $request->input($field)) {
+                $time = $request->input($field);
+                // Verifica se o formato precisa ser ajustado (se tem apenas um dígito para hora)
+                if (preg_match('/^(\d{1}):(\d{2})$/', $time, $matches)) {
+                    $hours = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+                    $request->merge([$field => "{$hours}:{$matches[2]}"]);
+                    $this->loggingService->logInfo("Formatted time field {$field} from {$time} to {$hours}:{$matches[2]}");
+                }
+            }
         }
     }
 }

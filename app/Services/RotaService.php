@@ -22,6 +22,9 @@ class RotaService
         // Set default values if not provided
         $data['tipo'] = $data['tipo'] ?? '';
         $data['status'] = $data['status'] ?? true;
+        
+        // Garante que os campos de hora estão no formato correto
+        $data = $this->ensureTimeFormat($data);
     
         return Rota::create($data);
     }
@@ -32,6 +35,9 @@ class RotaService
         if (!$rota) {
             return null;
         }
+        
+        // Garante que os campos de hora estão no formato correto
+        $data = $this->ensureTimeFormat($data);
 
         $rota->update($data);
         return $rota->fresh();
@@ -65,5 +71,31 @@ class RotaService
         }
 
         return $rota->viagens;
+    }
+    
+    /**
+     * Garante que todos os campos de hora estejam no formato correto
+     *
+     * @param array $data
+     * @return array
+     */
+    private function ensureTimeFormat(array $data): array
+    {
+        $timeFields = [
+            'horario_inicio',
+            'horario_fim'
+        ];
+        
+        foreach ($timeFields as $field) {
+            if (isset($data[$field]) && $data[$field]) {
+                $time = $data[$field];
+                if (preg_match('/^(\d{1,2}):(\d{2})$/', $time, $matches)) {
+                    $hours = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+                    $data[$field] = "{$hours}:{$matches[2]}";
+                }
+            }
+        }
+        
+        return $data;
     }
 }
