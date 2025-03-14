@@ -25,21 +25,57 @@ class AlunoController extends Controller
     public function index(): JsonResponse
     {
         $this->loggingService->logInfo('Fetching all alunos');
-        $alunos = $this->alunoService->getAllAlunos();
-        $response = [
-            'data' => $alunos,
-            '_links' => $this->hateoasService->generateCollectionLinks('alunos')
-        ];
-        return response()->json($response);
+        try {
+            $alunos = $this->alunoService->getAllAlunos();
+            
+            // Verificação explícita para garantir que temos um objeto de paginação válido
+            if (!$alunos) {
+                throw new \Exception("Falha ao recuperar os dados de alunos");
+            }
+            
+            // Assegurar que items() retorna um array, mesmo que vazio
+            $data = method_exists($alunos, 'items') ? $alunos->items() : [];
+            
+            $response = [
+                'data' => $data,
+                'meta' => [
+                    'current_page' => method_exists($alunos, 'currentPage') ? $alunos->currentPage() : 1,
+                    'per_page' => method_exists($alunos, 'perPage') ? $alunos->perPage() : count($data),
+                    'total' => method_exists($alunos, 'total') ? $alunos->total() : count($data),
+                    'last_page' => method_exists($alunos, 'lastPage') ? $alunos->lastPage() : 1
+                ],
+                '_links' => $this->hateoasService->generateCollectionLinks('alunos', $alunos)
+            ];
+            
+            return response()->json($response);
+        } catch (\Exception $e) {
+            $this->loggingService->logError('Error fetching alunos: ' . $e->getMessage());
+            
+            // Em caso de erro, ainda retorna uma estrutura JSON válida
+            return response()->json([
+                'data' => [],
+                'meta' => [
+                    'current_page' => 1,
+                    'per_page' => 10,
+                    'total' => 0,
+                    'last_page' => 1
+                ],
+                '_links' => $this->hateoasService->generateCollectionLinks('alunos'),
+                'error' => 'Erro ao recuperar alunos: ' . $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
-
+    
     public function show(int $id): JsonResponse
     {
         $this->loggingService->logInfo('Fetching aluno', ['id' => $id]);
         $aluno = $this->alunoService->getAlunoById($id);
         if (!$aluno) {
             $this->loggingService->logError('Aluno not found', ['id' => $id]);
-            return response()->json(['message' => 'Aluno não encontrado'], Response::HTTP_NOT_FOUND);
+            return response()->json([
+                'message' => 'Aluno não encontrado',
+                'status' => 'error'
+            ], Response::HTTP_NOT_FOUND);
         }
 
         $response = [
@@ -70,20 +106,24 @@ class AlunoController extends Controller
 
             return response()->json([
                 'data' => $aluno,
-                '_links' => $this->hateoasService->generateLinks('alunos', $aluno->id)
+                '_links' => $this->hateoasService->generateLinks('alunos', $aluno->id),
+                'message' => 'Aluno criado com sucesso',
+                'status' => 'success'
             ], Response::HTTP_CREATED);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $this->loggingService->logError('Validation failed: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Validation error',
+                'message' => 'Erro de validação',
                 'errors' => $e->errors(),
-                '_links' => $this->hateoasService->generateCollectionLinks('alunos')
+                '_links' => $this->hateoasService->generateCollectionLinks('alunos'),
+                'status' => 'error'
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
             $this->loggingService->logError('Server error: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Server error',
-                '_links' => $this->hateoasService->generateCollectionLinks('alunos')
+                'message' => 'Erro no servidor: ' . $e->getMessage(),
+                '_links' => $this->hateoasService->generateCollectionLinks('alunos'),
+                'status' => 'error'
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -108,27 +148,32 @@ class AlunoController extends Controller
                 $this->loggingService->logError('Aluno update failed', ['id' => $id]);
                 return response()->json([
                     'message' => 'Aluno não encontrado',
-                    '_links' => $this->hateoasService->generateCollectionLinks('alunos')
+                    '_links' => $this->hateoasService->generateCollectionLinks('alunos'),
+                    'status' => 'error'
                 ], Response::HTTP_NOT_FOUND);
             }
 
             $this->loggingService->logInfo('Aluno updated successfully', ['id' => $id]);
             return response()->json([
                 'data' => $aluno,
-                '_links' => $this->hateoasService->generateLinks('alunos', $id)
+                '_links' => $this->hateoasService->generateLinks('alunos', $id),
+                'message' => 'Aluno atualizado com sucesso',
+                'status' => 'success'
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $this->loggingService->logError('Validation error: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Validation error',
+                'message' => 'Erro de validação',
                 'errors' => $e->errors(),
-                '_links' => $this->hateoasService->generateCollectionLinks('alunos')
+                '_links' => $this->hateoasService->generateCollectionLinks('alunos'),
+                'status' => 'error'
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
             $this->loggingService->logError('Server error: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Server error',
-                '_links' => $this->hateoasService->generateCollectionLinks('alunos')
+                'message' => 'Erro no servidor: ' . $e->getMessage(),
+                '_links' => $this->hateoasService->generateCollectionLinks('alunos'),
+                'status' => 'error'
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -142,17 +187,22 @@ class AlunoController extends Controller
                 $this->loggingService->logError('Aluno deletion failed', ['id' => $id]);
                 return response()->json([
                     'message' => 'Aluno não encontrado',
-                    '_links' => $this->hateoasService->generateCollectionLinks('alunos')
+                    '_links' => $this->hateoasService->generateCollectionLinks('alunos'),
+                    'status' => 'error'
                 ], Response::HTTP_NOT_FOUND);
             }
 
             $this->loggingService->logInfo('Aluno deleted successfully', ['id' => $id]);
-            return response()->json(null, Response::HTTP_NO_CONTENT);
+            return response()->json([
+                'message' => 'Aluno excluído com sucesso',
+                'status' => 'success'
+            ], Response::HTTP_OK);
         } catch (\Exception $e) {
             $this->loggingService->logError('Deletion error: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Server error',
-                '_links' => $this->hateoasService->generateCollectionLinks('alunos')
+                'message' => 'Erro ao excluir: ' . $e->getMessage(),
+                '_links' => $this->hateoasService->generateCollectionLinks('alunos'),
+                'status' => 'error'
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -163,13 +213,17 @@ class AlunoController extends Controller
         $aluno = $this->alunoService->getAlunoById($id);
         if (!$aluno) {
             $this->loggingService->logError('Aluno not found', ['id' => $id]);
-            return response()->json(['message' => 'Aluno não encontrado'], Response::HTTP_NOT_FOUND);
+            return response()->json([
+                'message' => 'Aluno não encontrado', 
+                'status' => 'error'
+            ], Response::HTTP_NOT_FOUND);
         }
 
         $presencas = $this->alunoService->getAlunoPresencas($id);
         return response()->json([
             'data' => $presencas,
-            '_links' => $this->hateoasService->generateLinks('alunos', $id)
+            '_links' => $this->hateoasService->generateLinks('alunos', $id),
+            'status' => 'success'
         ]);
     }
 }
