@@ -54,6 +54,11 @@ class MotoristaController extends Controller
     {
         try {
             $this->loggingService->logInfo('Creating new motorista');
+            
+            // Log input data for debugging
+            $this->loggingService->logInfo('Input data', ['data' => $request->all()]);
+            
+            // Validate basic fields
             $validatedData = $request->validate([
                 'nome' => 'required|string|max:255',
                 'cpf' => 'required|string|max:14',
@@ -62,9 +67,41 @@ class MotoristaController extends Controller
                 'validade_cnh' => 'required|date',
                 'telefone' => 'required|string|max:20',
                 'endereco' => 'required|string',
-                'data_contratacao' => 'required|date',
-                'status' => 'required|boolean'
+                'data_contratacao' => 'required|date'
             ]);
+            
+            // Handle status field separately with flexibility
+            if ($request->has('status')) {
+                $status = $request->input('status');
+                
+                // Convert status to appropriate format
+                if (is_bool($status)) {
+                    $validatedData['status'] = $status ? 'Ativo' : 'Inativo';
+                } elseif (is_numeric($status)) {
+                    $validatedData['status'] = $status ? 'Ativo' : 'Inativo';
+                } elseif (is_string($status)) {
+                    // Map various string formats to expected enum values
+                    $statusLower = strtolower($status);
+                    if (in_array($statusLower, ['active', 'ativo', '1', 'true'])) {
+                        $validatedData['status'] = 'Ativo';
+                    } elseif (in_array($statusLower, ['inactive', 'inativo', '0', 'false'])) {
+                        $validatedData['status'] = 'Inativo';
+                    } elseif (in_array($statusLower, ['vacation', 'ferias', 'férias'])) {
+                        $validatedData['status'] = 'Ferias';
+                    } elseif (in_array($statusLower, ['leave', 'licenca', 'licença'])) {
+                        $validatedData['status'] = 'Licenca';
+                    } else {
+                        $validatedData['status'] = $status; // Use as is if no match
+                    }
+                } else {
+                    $validatedData['status'] = 'Ativo'; // Default to Ativo
+                }
+            } else {
+                $validatedData['status'] = 'Ativo'; // Default if not provided
+            }
+            
+            // Log processed data
+            $this->loggingService->logInfo('Processed data', ['data' => $validatedData]);
 
             $motorista = $this->motoristaService->createMotorista($validatedData);
             $this->loggingService->logInfo('Motorista created', ['id' => $motorista->id]);
@@ -74,16 +111,17 @@ class MotoristaController extends Controller
                 '_links' => $this->hateoasService->generateLinks('motoristas', $motorista->id)
             ], Response::HTTP_CREATED);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            $this->loggingService->logError('Validation failed: ' . $e->getMessage());
+            $this->loggingService->logError('Validation failed: ' . $e->getMessage(), ['errors' => $e->errors()]);
             return response()->json([
                 'message' => 'Validation error',
                 'errors' => $e->errors(),
                 '_links' => $this->hateoasService->generateCollectionLinks('motoristas')
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            $this->loggingService->logError('Server error: ' . $e->getMessage());
+            $this->loggingService->logError('Server error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json([
                 'message' => 'Server error',
+                'error_details' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('motoristas')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -93,6 +131,11 @@ class MotoristaController extends Controller
     {
         try {
             $this->loggingService->logInfo('Updating motorista', ['id' => $id]);
+            
+            // Log input data for debugging
+            $this->loggingService->logInfo('Input data', ['data' => $request->all()]);
+            
+            // Validate basic fields
             $validatedData = $request->validate([
                 'nome' => 'sometimes|string|max:255',
                 'cpf' => 'sometimes|string|max:14',
@@ -101,9 +144,37 @@ class MotoristaController extends Controller
                 'validade_cnh' => 'sometimes|date',
                 'telefone' => 'sometimes|string|max:20',
                 'endereco' => 'sometimes|string',
-                'data_contratacao' => 'sometimes|date',
-                'status' => 'sometimes|boolean'
+                'data_contratacao' => 'sometimes|date'
             ]);
+            
+            // Handle status field separately with flexibility
+            if ($request->has('status')) {
+                $status = $request->input('status');
+                
+                // Convert status to appropriate format
+                if (is_bool($status)) {
+                    $validatedData['status'] = $status ? 'Ativo' : 'Inativo';
+                } elseif (is_numeric($status)) {
+                    $validatedData['status'] = $status ? 'Ativo' : 'Inativo';
+                } elseif (is_string($status)) {
+                    // Map various string formats to expected enum values
+                    $statusLower = strtolower($status);
+                    if (in_array($statusLower, ['active', 'ativo', '1', 'true'])) {
+                        $validatedData['status'] = 'Ativo';
+                    } elseif (in_array($statusLower, ['inactive', 'inativo', '0', 'false'])) {
+                        $validatedData['status'] = 'Inativo';
+                    } elseif (in_array($statusLower, ['vacation', 'ferias', 'férias'])) {
+                        $validatedData['status'] = 'Ferias';
+                    } elseif (in_array($statusLower, ['leave', 'licenca', 'licença'])) {
+                        $validatedData['status'] = 'Licenca';
+                    } else {
+                        $validatedData['status'] = $status; // Use as is if no match
+                    }
+                }
+            }
+            
+            // Log processed data
+            $this->loggingService->logInfo('Processed data', ['data' => $validatedData]);
 
             $motorista = $this->motoristaService->updateMotorista($id, $validatedData);
             if (!$motorista) {
@@ -120,16 +191,17 @@ class MotoristaController extends Controller
                 '_links' => $this->hateoasService->generateLinks('motoristas', $id)
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            $this->loggingService->logError('Validation error: ' . $e->getMessage());
+            $this->loggingService->logError('Validation error: ' . $e->getMessage(), ['errors' => $e->errors()]);
             return response()->json([
                 'message' => 'Validation error',
                 'errors' => $e->errors(),
                 '_links' => $this->hateoasService->generateCollectionLinks('motoristas')
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            $this->loggingService->logError('Server error: ' . $e->getMessage());
+            $this->loggingService->logError('Server error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json([
                 'message' => 'Server error',
+                'error_details' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('motoristas')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -151,9 +223,10 @@ class MotoristaController extends Controller
             $this->loggingService->logInfo('Motorista deleted successfully', ['id' => $id]);
             return response()->json(null, Response::HTTP_NO_CONTENT);
         } catch (\Exception $e) {
-            $this->loggingService->logError('Deletion error: ' . $e->getMessage());
+            $this->loggingService->logError('Deletion error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json([
                 'message' => 'Server error',
+                'error_details' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('motoristas')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
