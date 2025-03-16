@@ -63,7 +63,16 @@ class OnibusService
             return false;
         }
 
-        return $onibus->delete();
+        try {
+            // Check if there are related viagens
+            if ($onibus->viagens()->count() > 0) {
+                throw new \Exception('Não é possível excluir o ônibus porque existem viagens associadas a ele.');
+            }
+
+            return $onibus->delete();
+        } catch (\Exception $e) {
+            throw new \RuntimeException('Falha ao excluir ônibus: ' . $e->getMessage());
+        }
     }
 
     public function getOnibusViagens(int $id): Collection

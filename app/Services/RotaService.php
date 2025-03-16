@@ -4,73 +4,122 @@ namespace App\Services;
 
 use App\Models\Rota;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RotaService
 {
     public function getAllRotas(): Collection
     {
-        return Rota::all();
+        try {
+            return Rota::all();
+        } catch (\Exception $e) {
+            Log::error('Erro ao buscar todas as rotas: ' . $e->getMessage());
+            return collect([]);
+        }
     }
 
     public function getRotaById(int $id): ?Rota
     {
-        return Rota::find($id);
+        try {
+            return Rota::find($id);
+        } catch (\Exception $e) {
+            Log::error('Erro ao buscar rota por ID: ' . $e->getMessage(), ['id' => $id]);
+            return null;
+        }
     }
 
     public function createRota(array $data): Rota
     {
-        // Set default values if not provided
-        $data['tipo'] = $data['tipo'] ?? '';
-        $data['status'] = $data['status'] ?? true;
+        try {
+            // Set default values if not provided
+            $data['tipo'] = $data['tipo'] ?? 'Escolar';
+            $data['status'] = $data['status'] ?? true;
+            
+            // Garante que os campos de hora estão no formato correto
+            $data = $this->ensureTimeFormat($data);
         
-        // Garante que os campos de hora estão no formato correto
-        $data = $this->ensureTimeFormat($data);
-    
-        return Rota::create($data);
+            return Rota::create($data);
+        } catch (\Exception $e) {
+            Log::error('Erro ao criar rota: ' . $e->getMessage(), ['data' => $data]);
+            throw new \Exception('Não foi possível criar a rota: ' . $e->getMessage());
+        }
     }
 
     public function updateRota(int $id, array $data): ?Rota
     {
-        $rota = $this->getRotaById($id);
-        if (!$rota) {
-            return null;
-        }
-        
-        // Garante que os campos de hora estão no formato correto
-        $data = $this->ensureTimeFormat($data);
+        try {
+            $rota = $this->getRotaById($id);
+            if (!$rota) {
+                return null;
+            }
+            
+            // Garante que os campos de hora estão no formato correto
+            $data = $this->ensureTimeFormat($data);
 
-        $rota->update($data);
-        return $rota->fresh();
+            $rota->update($data);
+            return $rota->fresh();
+        } catch (\Exception $e) {
+            Log::error('Erro ao atualizar rota: ' . $e->getMessage(), ['id' => $id, 'data' => $data]);
+            throw new \Exception('Não foi possível atualizar a rota: ' . $e->getMessage());
+        }
     }
 
     public function deleteRota(int $id): bool
     {
-        $rota = $this->getRotaById($id);
-        if (!$rota) {
-            return false;
-        }
+        return DB::transaction(function() use ($id) {
+            try {
+                $rota = $this->getRotaById($id);
+                if (!$rota) {
+                    return false;
+                }
 
-        return $rota->delete();
+                // Verificar dependências antes de tentar excluir
+                if ($rota->viagens()->count() > 0) {
+                    throw new \Exception('Esta rota possui viagens vinculadas e não pode ser excluída');
+                }
+
+                // Remover relações com paradas antes de excluir a rota
+                if ($rota->paradas()->count() > 0) {
+                    $rota->paradas()->detach();
+                }
+
+                return $rota->delete();
+            } catch (\Exception $e) {
+                Log::error('Erro ao excluir rota: ' . $e->getMessage(), ['id' => $id]);
+                throw $e;
+            }
+        });
     }
 
     public function getRotaParadas(int $id): Collection
     {
-        $rota = $this->getRotaById($id);
-        if (!$rota) {
+        try {
+            $rota = $this->getRotaById($id);
+            if (!$rota) {
+                return collect([]);
+            }
+
+            return $rota->paradas()->orderBy('rota_parada.ordem')->get();
+        } catch (\Exception $e) {
+            Log::error('Erro ao buscar paradas da rota: ' . $e->getMessage(), ['id' => $id]);
             return collect([]);
         }
-
-        return $rota->paradas;
     }
 
     public function getRotaViagens(int $id): Collection
     {
-        $rota = $this->getRotaById($id);
-        if (!$rota) {
+        try {
+            $rota = $this->getRotaById($id);
+            if (!$rota) {
+                return collect([]);
+            }
+
+            return $rota->viagens()->orderBy('data_viagem', 'desc')->get();
+        } catch (\Exception $e) {
+            Log::error('Erro ao buscar viagens da rota: ' . $e->getMessage(), ['id' => $id]);
             return collect([]);
         }
-
-        return $rota->viagens;
     }
     
     /**

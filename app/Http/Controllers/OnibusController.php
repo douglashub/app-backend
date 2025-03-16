@@ -147,10 +147,10 @@ class OnibusController extends Controller
         } catch (\Exception $e) {
             $this->loggingService->logError('Deletion error: ' . $e->getMessage());
             return response()->json([
-                'message' => 'Server error',
+                'message' => 'Não foi possível excluir o ônibus',
                 'error_details' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('onibus')
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            ], Response::HTTP_BAD_REQUEST); // Changed from 500 to 400 for constraint violations
         }
     }
 
