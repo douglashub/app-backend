@@ -36,11 +36,20 @@ class ViagemController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
-            $this->loggingService->logInfo('Creating new viagem');
-            
+            // Log the entire incoming request data for debugging
+            $this->loggingService->logInfo('Incoming Viagem Creation Request', [
+                'all_data' => $request->all(),
+                'input_data' => $request->input()
+            ]);
+
             // Formatar campos de hora antes da validação
             $this->formatTimeFields($request);
-            
+
+            // Additional logging of formatted data
+            $this->loggingService->logInfo('Formatted Request Data', [
+                'formatted_data' => $request->all()
+            ]);
+
             $validatedData = $request->validate([
                 'data_viagem' => 'required|date',
                 'rota_id' => 'required|integer|exists:rotas,id',
@@ -55,9 +64,15 @@ class ViagemController extends Controller
                 'status' => 'required|boolean',
                 'observacoes' => 'nullable|string'
             ]);
-    
+
+            // Additional logging of validated data
+            $this->loggingService->logInfo('Validated Viagem Data', [
+                'validated_data' => $validatedData
+            ]);
+
             $viagem = $this->service->createViagem($validatedData);
             $this->loggingService->logInfo('Viagem created', ['id' => $viagem->id]);
+
             $relationships = [
                 'rota' => $viagem->rota_id,
                 'onibus' => $viagem->onibus_id,
@@ -65,27 +80,42 @@ class ViagemController extends Controller
                 'monitor' => $viagem->monitor_id,
                 'horario' => $viagem->horario_id
             ];
-    
+
             return response()->json([
                 'data' => $viagem,
                 '_links' => $this->hateoasService->generateLinks('viagens', $viagem->id, $relationships)
             ], Response::HTTP_CREATED);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            $this->loggingService->logError('Validation failed: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Validation error',
+            // More detailed validation error logging
+            $this->loggingService->logError('Validation failed', [
+                'message' => $e->getMessage(),
                 'errors' => $e->errors(),
+                'request_data' => $request->all()
+            ]);
+
+            return response()->json([
+                'message' => 'Erro de validação',
+                'errors' => $e->errors(),
+                'request_data' => $request->all(), // Include request data for debugging
                 '_links' => $this->hateoasService->generateCollectionLinks('viagens')
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Exception $e) {
-            $this->loggingService->logError('Server error: ' . $e->getMessage());
+            // More comprehensive error logging
+            $this->loggingService->logError('Server error during viagem creation', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+
             return response()->json([
-                'message' => 'Server error',
+                'message' => 'Erro no servidor',
+                'error_details' => $e->getMessage(),
+                'request_data' => $request->all(), // Include request data for debugging
                 '_links' => $this->hateoasService->generateCollectionLinks('viagens')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-    
+
     public function show(int $id): JsonResponse
     {
         $this->loggingService->logInfo('Fetching viagem', ['id' => $id]);
@@ -115,10 +145,10 @@ class ViagemController extends Controller
     {
         try {
             $this->loggingService->logInfo('Updating viagem', ['id' => $id]);
-            
+
             // Formatar campos de hora antes da validação
             $this->formatTimeFields($request);
-            
+
             $validatedData = $request->validate([
                 'data_viagem' => 'sometimes|date',
                 'rota_id' => 'sometimes|integer|exists:rotas,id',
@@ -126,17 +156,17 @@ class ViagemController extends Controller
                 'motorista_id' => 'sometimes|integer|exists:motoristas,id',
                 'monitor_id' => 'nullable|integer|exists:monitores,id',
                 'horario_id' => 'sometimes|integer|exists:horarios,id',
-                
+
                 // Modificar validação de campos de hora
                 'hora_saida_prevista' => 'nullable|date_format:H:i',
                 'hora_chegada_prevista' => 'nullable|date_format:H:i',
                 'hora_saida_real' => 'nullable|date_format:H:i',
                 'hora_chegada_real' => 'nullable|date_format:H:i',
-                
+
                 'status' => 'sometimes|boolean',
                 'observacoes' => 'nullable|string'
             ]);
-    
+
             $viagem = $this->service->updateViagem($id, $validatedData);
             if (!$viagem) {
                 $this->loggingService->logError('Viagem update failed', ['id' => $id]);
@@ -145,9 +175,9 @@ class ViagemController extends Controller
                     '_links' => $this->hateoasService->generateCollectionLinks('viagens')
                 ], Response::HTTP_NOT_FOUND);
             }
-    
+
             $this->loggingService->logInfo('Viagem updated successfully', ['id' => $id]);
-            
+
             $relationships = [
                 'rotas' => $viagem->rota_id,
                 'onibus' => $viagem->onibus_id,
@@ -155,7 +185,7 @@ class ViagemController extends Controller
                 'monitores' => $viagem->monitor_id,
                 'horarios' => $viagem->horario_id
             ];
-            
+
             return response()->json([
                 'data' => $viagem,
                 '_links' => $this->hateoasService->generateLinks('viagens', $id, $relationships)
@@ -199,7 +229,7 @@ class ViagemController extends Controller
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-    
+
     /**
      * Formata os campos de hora para garantir que estejam no padrão H:i
      * 
@@ -214,7 +244,7 @@ class ViagemController extends Controller
             'hora_saida_real',
             'hora_chegada_real'
         ];
-        
+
         foreach ($timeFields as $field) {
             if ($request->has($field) && $request->input($field)) {
                 $time = $request->input($field);

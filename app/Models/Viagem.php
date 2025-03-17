@@ -25,32 +25,33 @@ class Viagem extends Model
         'status',
     ];
 
-    // Define the relationship between Viagem and Rota
+    // Add the horario relationship
+    public function horario(): BelongsTo
+    {
+        return $this->belongsTo(Horario::class);
+    }
+
+    // Existing relationships remain the same
     public function rota(): BelongsTo
     {
         return $this->belongsTo(Rota::class);
     }
 
-    // Define the relationship between Viagem and Onibus
     public function onibus(): BelongsTo
     {
         return $this->belongsTo(Onibus::class);
     }
 
-    // Define the relationship between Viagem and Motorista
     public function motorista(): BelongsTo
     {
         return $this->belongsTo(Motorista::class);
     }
 
-    // Define the relationship between Viagem and Monitor (nullable)
     public function monitor(): BelongsTo
     {
-        // Handle nullability of monitor_id (monitor can be null)
-        return $this->belongsTo(Monitor::class)->withDefault(); // Add a default value for nullable relationships
+        return $this->belongsTo(Monitor::class)->withDefault();
     }
 
-    // Define the relationship between Viagem and Presenca
     public function presencas(): HasMany
     {
         return $this->hasMany(Presenca::class);

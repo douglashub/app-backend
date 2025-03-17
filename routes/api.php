@@ -68,16 +68,18 @@ Route::middleware('api')->group(function () {
         // Relatórios de Motoristas
         Route::get('/motoristas', 'App\Http\Controllers\ReportController@motoristaReport');
         Route::get('/motoristas/excel', 'App\Http\Controllers\ReportController@motoristaReportExcel');
+        Route::get('/motoristas/pdf', 'App\Http\Controllers\ReportController@motoristaReportPdf');
 
         // Relatórios de Monitores
         Route::get('/monitores', 'App\Http\Controllers\ReportController@monitorReport');
         Route::get('/monitores/excel', 'App\Http\Controllers\ReportController@monitorReportExcel');
+        Route::get('/monitores/pdf', 'App\Http\Controllers\ReportController@monitorReportPdf');
 
-        // Relatórios de Viagens
+        // Relatórios de Viagens - Remove duplicates and simplify
         Route::get('/viagens', ['as' => 'relatorios.viagens', 'uses' => 'App\Http\Controllers\ReportController@viagemReport'])
             ->middleware('convert.boolean');
-
-        Route::get('/viagens/excel', ['as' => 'relatorios.viagens.excel', 'uses' => 'App\Http\Controllers\ReportController@viagemReportExcel'])
+        Route::get('/viagens/excel', 'App\Http\Controllers\ReportController@viagemReportExcel')
             ->middleware('convert.boolean');
+        Route::get('/viagens/pdf', 'App\Http\Controllers\ReportController@viagemReportPdf');
     });
 });

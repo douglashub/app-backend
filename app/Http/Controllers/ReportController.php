@@ -14,6 +14,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Color;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 
 class ReportController extends Controller
@@ -390,8 +391,6 @@ class ReportController extends Controller
     public function viagemReportExcel(Request $request)
     {
         try {
-            $this->loggingService->logInfo('Gerando relatório de viagens em Excel');
-
             $filters = $request->validate([
                 'data_inicio' => 'nullable|date',
                 'data_fim' => 'nullable|date',
@@ -399,17 +398,29 @@ class ReportController extends Controller
                 'motorista_id' => 'nullable|integer',
                 'monitor_id' => 'nullable|integer',
                 'onibus_id' => 'nullable|integer',
-                'status' => 'nullable|boolean'
+                'status' => 'nullable',
+                'cargo' => 'nullable|string|in:Efetivo,ACT,Temporário'
             ]);
 
-            $report = $this->reportService->getViagemReport($filters);
+            // Convert status to proper boolean if present
+            if (isset($filters['status'])) {
+                if (is_string($filters['status'])) {
+                    $statusLower = strtolower($filters['status']);
+                    $filters['status'] = in_array($statusLower, ['true', '1', 'on', 'yes', 'ativo']) ? true : false;
+                } else {
+                    $filters['status'] = (bool)$filters['status'];
+                }
+            }
 
-            // Criar planilha
+            // Get the report data
+            $reportData = $this->reportService->getViagemReport($filters);
+
+            // Create spreadsheet
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Relatório de Viagens');
 
-            // Estilo para o cabeçalho
+            // Header style
             $headerStyle = [
                 'font' => [
                     'bold' => true,
@@ -429,80 +440,100 @@ class ReportController extends Controller
                 ],
             ];
 
-            // Definir cabeçalhos
-            $sheet->setCellValue('A1', 'Data');
-            $sheet->setCellValue('B1', 'Rota');
-            $sheet->setCellValue('C1', 'Horário');
-            $sheet->setCellValue('D1', 'Motorista');
-            $sheet->setCellValue('E1', 'Cargo Motorista');
-            $sheet->setCellValue('F1', 'Monitor');
-            $sheet->setCellValue('G1', 'Cargo Monitor');
-            $sheet->setCellValue('H1', 'Ônibus');
-            $sheet->setCellValue('I1', 'Saída Prevista');
-            $sheet->setCellValue('J1', 'Chegada Prevista');
-            $sheet->setCellValue('K1', 'Saída Real');
-            $sheet->setCellValue('L1', 'Chegada Real');
-            $sheet->setCellValue('M1', 'Status');
+            // Set headers
+            $headers = [
+                'A' => 'Data',
+                'B' => 'Rota',
+                'C' => 'Motorista',
+                'D' => 'Monitor',
+                'E' => 'Ônibus',
+                'F' => 'Saída Prevista',
+                'G' => 'Chegada Prevista',
+                'H' => 'Status'
+            ];
 
-            // Aplicar estilo ao cabeçalho
-            $sheet->getStyle('A1:M1')->applyFromArray($headerStyle);
+            // Add headers and apply style
+            foreach ($headers as $col => $header) {
+                $sheet->setCellValue("{$col}1", $header);
+            }
+            $sheet->getStyle('A1:H1')->applyFromArray($headerStyle);
 
-            // Preencher dados
+            // Add data
             $row = 2;
-            foreach ($report['data'] as $viagem) {
-                $sheet->setCellValue('A' . $row, $viagem['data']);
-                $sheet->setCellValue('B' . $row, $viagem['rota']);
-                $sheet->setCellValue('C' . $row, $viagem['horario']);
-                $sheet->setCellValue('D' . $row, $viagem['motorista']['nome']);
-                $sheet->setCellValue('E' . $row, $viagem['motorista']['cargo']);
-                $sheet->setCellValue('F' . $row, $viagem['monitor']['nome']);
-                $sheet->setCellValue('G' . $row, $viagem['monitor']['cargo']);
-                $sheet->setCellValue('H' . $row, $viagem['onibus']);
-                $sheet->setCellValue('I' . $row, $viagem['hora_saida_prevista']);
-                $sheet->setCellValue('J' . $row, $viagem['hora_chegada_prevista']);
-                $sheet->setCellValue('K' . $row, $viagem['hora_saida_real']);
-                $sheet->setCellValue('L' . $row, $viagem['hora_chegada_real']);
-                $sheet->setCellValue('M' . $row, $viagem['status']);
+            foreach ($reportData['data'] as $viagem) {
+                $sheet->setCellValue("A{$row}", Carbon::parse($viagem['data_viagem'])->format('d/m/Y'));
+                $sheet->setCellValue("B{$row}", $viagem['rota']['nome'] ?? 'N/A');
+                $sheet->setCellValue("C{$row}", $viagem['motorista']['nome'] ?? 'N/A');
+                $sheet->setCellValue("D{$row}", $viagem['monitor']['nome'] ?? 'N/A');
+                $sheet->setCellValue("E{$row}", $viagem['onibus']['placa'] ?? 'N/A');
+                $sheet->setCellValue("F{$row}", $viagem['hora_saida_prevista'] ?? 'N/A');
+                $sheet->setCellValue("G{$row}", $viagem['hora_chegada_prevista'] ?? 'N/A');
+                $sheet->setCellValue("H{$row}", $viagem['status']);
                 $row++;
             }
 
-            // Auto-dimensionar colunas
-            foreach (range('A', 'M') as $col) {
+            // Auto-size columns
+            foreach (range('A', 'H') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 
-            // Adicionar informações de filtro
-            $row += 2;
-            $sheet->setCellValue('A' . $row, 'Filtros Aplicados:');
-            $sheet->getStyle('A' . $row)->getFont()->setBold(true);
-            $row++;
+            // Add filters sheet
+            $filtersSheet = $spreadsheet->createSheet();
+            $filtersSheet->setTitle('Filtros Aplicados');
+            $filtersSheet->setCellValue('A1', 'Filtro');
+            $filtersSheet->setCellValue('B1', 'Valor');
+            $filtersSheet->getStyle('A1:B1')->applyFromArray($headerStyle);
 
-            if (!empty($filters['data_inicio']) && !empty($filters['data_fim'])) {
-                $sheet->setCellValue('A' . $row, 'Período:');
-                $sheet->setCellValue('B' . $row, Carbon::parse($filters['data_inicio'])->format('d/m/Y') . ' a ' . Carbon::parse($filters['data_fim'])->format('d/m/Y'));
-                $row++;
+            $filtersRow = 2;
+            foreach ($filters as $key => $value) {
+                if ($value !== null && $value !== '') {
+                    $displayValue = $value;
+
+                    // Format specific filters
+                    if ($key === 'data_inicio' || $key === 'data_fim') {
+                        $displayValue = Carbon::parse($value)->format('d/m/Y');
+                    }
+
+                    if ($key === 'status') {
+                        $displayValue = $value ? 'Ativo' : 'Inativo';
+                    }
+
+                    $filtersSheet->setCellValue("A{$filtersRow}", ucfirst(str_replace('_', ' ', $key)));
+                    $filtersSheet->setCellValue("B{$filtersRow}", $displayValue);
+                    $filtersRow++;
+                }
             }
 
-            $sheet->setCellValue('A' . $row, 'Data de Geração:');
-            $sheet->setCellValue('B' . $row, Carbon::now()->format('d/m/Y H:i:s'));
+            // Auto-size columns for filters sheet
+            $filtersSheet->getColumnDimension('A')->setAutoSize(true);
+            $filtersSheet->getColumnDimension('B')->setAutoSize(true);
 
-            // Criar o arquivo Excel
-            $writer = new Xlsx($spreadsheet);
+            // Generate filename
             $filename = 'relatorio_viagens_' . Carbon::now()->format('YmdHis') . '.xlsx';
-            $path = storage_path('app/public/' . $filename);
-            $writer->save($path);
+            $filepath = storage_path('app/public/' . $filename);
 
-            $this->loggingService->logInfo('Relatório de viagens em Excel gerado com sucesso', ['filename' => $filename]);
+            // Save the file
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($filepath);
 
-            return response()->download($path, $filename, [
+            $this->loggingService->logInfo('Relatório de viagens em Excel gerado com sucesso', [
+                'filename' => $filename
+            ]);
+
+            // Download the file
+            return response()->download($filepath, $filename, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ])->deleteFileAfterSend(true);
         } catch (\Exception $e) {
-            $this->loggingService->logError('Erro ao gerar relatório de viagens em Excel: ' . $e->getMessage());
+            $this->loggingService->logError('Erro ao gerar relatório de viagens em Excel', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'filters' => $filters ?? []
+            ]);
 
             return response()->json([
                 'message' => 'Erro ao gerar relatório de viagens em Excel',
-                'error' => $e->getMessage(),
+                'error_details' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('relatorios/viagens')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -546,6 +577,147 @@ class ReportController extends Controller
                 'message' => 'Erro ao obter opções para relatórios',
                 'error' => $e->getMessage(),
                 '_links' => $this->hateoasService->generateCollectionLinks('relatorios')
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+
+    /**
+     * Gera relatório de motoristas em formato PDF
+     */
+    public function motoristaReportPdf(Request $request)
+    {
+        try {
+            $this->loggingService->logInfo('Gerando relatório de motoristas em PDF');
+
+            $filters = $request->validate([
+                'data_inicio' => 'nullable|date',
+                'data_fim' => 'nullable|date',
+                'rota_id' => 'nullable|integer',
+                'cargo' => 'nullable|string|in:Efetivo,ACT,Temporário',
+                'status' => 'nullable|string'
+            ]);
+
+            $report = $this->reportService->getMotoristaReport($filters);
+
+            $pdf = Pdf::loadView('reports.motoristas', [
+                'report' => $report,
+                'title' => 'Relatório de Motoristas',
+                'filters' => $filters
+            ]);
+
+            $filename = 'relatorio_motoristas_' . Carbon::now()->format('YmdHis') . '.pdf';
+
+            $this->loggingService->logInfo('Relatório de motoristas em PDF gerado com sucesso');
+
+            return $pdf->download($filename);
+        } catch (\Exception $e) {
+            $this->loggingService->logError('Erro ao gerar relatório de motoristas em PDF: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Erro ao gerar relatório de motoristas em PDF',
+                'error' => $e->getMessage(),
+                '_links' => $this->hateoasService->generateCollectionLinks('relatorios/motoristas')
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Gera relatório de monitores em formato PDF
+     */
+    public function monitorReportPdf(Request $request)
+    {
+        try {
+            $this->loggingService->logInfo('Gerando relatório de monitores em PDF');
+
+            $filters = $request->validate([
+                'data_inicio' => 'nullable|date',
+                'data_fim' => 'nullable|date',
+                'rota_id' => 'nullable|integer',
+                'cargo' => 'nullable|string|in:Efetivo,ACT,Temporário',
+                'status' => 'nullable|string'
+            ]);
+
+            $report = $this->reportService->getMonitorReport($filters);
+
+            $pdf = Pdf::loadView('reports.monitores', [
+                'report' => $report,
+                'title' => 'Relatório de Monitores',
+                'filters' => $filters
+            ]);
+
+            $filename = 'relatorio_monitores_' . Carbon::now()->format('YmdHis') . '.pdf';
+
+            $this->loggingService->logInfo('Relatório de monitores em PDF gerado com sucesso');
+
+            return $pdf->download($filename);
+        } catch (\Exception $e) {
+            $this->loggingService->logError('Erro ao gerar relatório de monitores em PDF: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Erro ao gerar relatório de monitores em PDF',
+                'error' => $e->getMessage(),
+                '_links' => $this->hateoasService->generateCollectionLinks('relatorios/monitores')
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Gera relatório de viagens em formato PDF
+     */
+    public function viagemReportPdf(Request $request)
+    {
+        try {
+            $filters = $request->validate([
+                'data_inicio' => 'nullable|date',
+                'data_fim' => 'nullable|date',
+                'rota_id' => 'nullable|integer',
+                'motorista_id' => 'nullable|integer',
+                'monitor_id' => 'nullable|integer',
+                'onibus_id' => 'nullable|integer',
+                'status' => 'nullable',
+                'cargo' => 'nullable|string|in:Efetivo,ACT,Temporário'
+            ]);
+
+            // Convert status to proper boolean if present
+            if (isset($filters['status'])) {
+                if (is_string($filters['status'])) {
+                    $statusLower = strtolower($filters['status']);
+                    $filters['status'] = in_array($statusLower, ['true', '1', 'on', 'yes', 'ativo']) ? true : false;
+                } else {
+                    $filters['status'] = (bool)$filters['status'];
+                }
+            }
+
+            // Ensure the report data is structured correctly
+            $reportData = $this->reportService->getViagemReport($filters);
+
+            // Prepare view data with consistent structure
+            $viewData = [
+                'report' => [
+                    'data' => $reportData['data'],
+                    'total' => $reportData['total']
+                ],
+                'filters' => $filters,
+                'title' => 'Relatório de Viagens'
+            ];
+
+            $pdf = Pdf::loadView('reports.viagens', $viewData);
+
+            $filename = 'relatorio_viagens_' . Carbon::now()->format('YmdHis') . '.pdf';
+
+            $this->loggingService->logInfo('Relatório de viagens em PDF gerado com sucesso');
+
+            return $pdf->download($filename);
+        } catch (\Exception $e) {
+            $this->loggingService->logError('Erro ao gerar relatório de viagens em PDF: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao gerar relatório de viagens em PDF',
+                'error_details' => $e->getMessage(),
+                '_links' => $this->hateoasService->generateCollectionLinks('relatorios/viagens')
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
