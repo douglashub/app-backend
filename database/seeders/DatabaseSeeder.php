@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             HorarioSeeder::class,
             ViagemSeeder::class,
             PresencaSeeder::class,
+            CargoSeeder::class,
         ]);
     }
 }

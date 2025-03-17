@@ -15,11 +15,35 @@ class Monitor extends Model
         'telefone',
         'endereco',
         'data_contratacao',
-        'status'
+        'status',
+        'cargo'
+    ];
+
+    protected $casts = [
+        'data_contratacao' => 'date'
     ];
 
     public function viagens(): HasMany
     {
         return $this->hasMany(Viagem::class);
+    }
+
+    /**
+     * Set the monitor's cargo.
+     * This mutator ensures the cargo is always in the correct format
+     *
+     * @param  mixed  $value
+     * @return void
+     */
+    public function setCargoAttribute($value)
+    {
+        $allowedCargos = ['Efetivo', 'ACT', 'Temporário'];
+        
+        if (is_string($value) && in_array($value, $allowedCargos)) {
+            $this->attributes['cargo'] = $value;
+        } else {
+            // Default to Efetivo if not recognized
+            $this->attributes['cargo'] = 'Efetivo';
+        }
     }
 }

@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // Register your middleware alias here
+        $middleware->alias([
+            'convert.boolean' => \App\Http\Middleware\ConvertStringToBoolean::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
