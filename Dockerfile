@@ -90,9 +90,10 @@ COPY .env.example .env
 # Generate application key
 RUN php artisan key:generate --force
 
-# Create nginx configuration
+# Nginx configuration
+# Use 0.0.0.0:80 (instead of 0.0.0.0:$PORT) to avoid "invalid port" error
 RUN echo 'server { \
-    listen 0.0.0.0:$PORT; \
+    listen 0.0.0.0:80; \
     server_name _; \
     root /var/www/html/public; \
     index index.php; \
@@ -107,7 +108,7 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/sites-available/default
 
-# Create supervisord configuration (multiline correctly)
+# Supervisor configuration
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 \n\
@@ -129,7 +130,7 @@ stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# (Optional) DNS resolution check
+# Optional: DNS resolution check
 # RUN echo "Resolving postgres.railway.internal..." \
 #     && nslookup postgres.railway.internal || (echo "DNS resolution failed" && exit 1)
 
@@ -149,8 +150,8 @@ RUN echo "Contents of .env:" \
     && echo "\nContents of .env.example:" \
     && cat .env.example
 
-# Expose the port
-EXPOSE $PORT
+# Expose port 80 (inside the container)
+EXPOSE 80
 
 # Start container
 CMD ["/usr/local/bin/start-container"]
