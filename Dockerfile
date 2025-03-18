@@ -29,12 +29,11 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Configure and install PHP extensions
 RUN docker-php-ext-configure gd \
-        --with-freetype \
-        --with-jpeg \
-        --with-webp \
-        --with-xpm
+    --with-freetype \
+    --with-jpeg \
+    --with-webp \
+    --with-xpm
 
-# Install PHP extensions
 RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd zip
 
 # Install Composer
@@ -82,7 +81,7 @@ RUN chmod +x /var/www/html/deploy/migrate.sh \
     /var/www/html/public \
     /var/www/html/deploy
 
-# Install Composer dependencies
+# Install Composer dependencies (production)
 RUN composer install --optimize-autoloader --no-dev
 
 # Copy .env.example to .env
@@ -108,23 +107,31 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/sites-available/default
 
-# Create supervisord configuration
-RUN echo '[supervisord] \
-nodaemon=true \
+# Create supervisord configuration (multiline correctly)
+RUN echo "[supervisord]\n\
+nodaemon=true\n\
 \n\
-[program:php-fpm] \
-command=/usr/local/sbin/php-fpm \
-autostart=true \
-autorestart=true \
+[program:php-fpm]\n\
+command=/usr/local/sbin/php-fpm\n\
+autostart=true\n\
+autorestart=true\n\
+stdout_logfile=/dev/stdout\n\
+stdout_logfile_maxbytes=0\n\
+stderr_logfile=/dev/stderr\n\
+stderr_logfile_maxbytes=0\n\
 \n\
-[program:nginx] \
-command=/usr/sbin/nginx -g "daemon off;" \
-autostart=true \
-autorestart=true' > /etc/supervisor/conf.d/supervisord.conf
+[program:nginx]\n\
+command=/usr/sbin/nginx -g 'daemon off;'\n\
+autostart=true\n\
+autorestart=true\n\
+stdout_logfile=/dev/stdout\n\
+stdout_logfile_maxbytes=0\n\
+stderr_logfile=/dev/stderr\n\
+stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# DNS resolution check
-#RUN echo "Resolving postgres.railway.internal..." \
-#    && nslookup postgres.railway.internal || (echo "DNS resolution failed" && exit 1)
+# (Optional) DNS resolution check
+# RUN echo "Resolving postgres.railway.internal..." \
+#     && nslookup postgres.railway.internal || (echo "DNS resolution failed" && exit 1)
 
 # Create start script
 RUN echo '#!/bin/bash \n\
@@ -132,16 +139,17 @@ RUN echo '#!/bin/bash \n\
 /var/www/html/deploy/migrate.sh \n\
 \n\
 # Start supervisord \n\
-/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
+/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' \
+> /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Display the contents of .env and .env.example after successful build
+# Display the contents of .env and .env.example after successful build (debug)
 RUN echo "Contents of .env:" \
     && cat .env \
     && echo "\nContents of .env.example:" \
     && cat .env.example
 
-# Expose port
+# Expose the port
 EXPOSE $PORT
 
 # Start container
