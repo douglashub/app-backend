@@ -1,10 +1,10 @@
-# Use the official PHP 8.2 FPM base image
+# Use a imagem oficial do PHP 8.2 com FPM
 FROM php:8.2.4-fpm
 
-# Set working directory
+# Definir diretório de trabalho
 WORKDIR /var/www/html
 
-# Install system dependencies
+# Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -26,97 +26,43 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     postgresql-client \
     gettext-base \
-    net-tools
+    net-tools \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Configure and install PHP extensions
+# Configurar e instalar extensões do PHP
 RUN docker-php-ext-configure gd \
     --with-freetype \
     --with-jpeg \
     --with-webp \
     --with-xpm
-
 RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd zip
 
-# Install Composer
+# Instalar Composer
 COPY --from=composer:2.5.4 /usr/bin/composer /usr/bin/composer
 
-# Create necessary directories with proper permissions
-RUN mkdir -p /var/www/html/storage/framework/sessions \
-    && mkdir -p /var/www/html/storage/framework/views \
-    && mkdir -p /var/www/html/storage/framework/cache \
-    && mkdir -p /var/www/html/bootstrap/cache \
-    && mkdir -p /var/www/html/deploy
-
-# Copy application files
+# Copiar arquivos do projeto
 COPY . .
 
-# Create migration script
-RUN echo '#!/bin/bash \n\
-MAX_ATTEMPTS=10 \n\
-ATTEMPT=0 \n\
-\n\
-while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do \n\
-    echo "Attempting to run migrations (Attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)" \n\
-    \n\
-    php artisan migrate --force \n\
-    \n\
-    if [ $? -eq 0 ]; then \n\
-        echo "Migrations completed successfully!" \n\
-        exit 0 \n\
-    fi \n\
-    \n\
-    echo "Migration failed. Waiting 10 seconds before retrying..." \n\
-    sleep 10 \n\
-    \n\
-    ATTEMPT=$((ATTEMPT+1)) \n\
-done \n\
-\n\
-echo "Migrations failed after $MAX_ATTEMPTS attempts" \n\
-exit 1' > /var/www/html/deploy/migrate.sh
+# Ajustar permissões
+RUN chmod -R 775 storage bootstrap/cache && chown -R www-data:www-data storage bootstrap/cache
 
-# Set proper permissions
-RUN chmod +x /var/www/html/deploy/migrate.sh \
-    && chown -R www-data:www-data \
-    /var/www/html/storage \
-    /var/www/html/bootstrap/cache \
-    /var/www/html/public \
-    /var/www/html/deploy
+# Configurar PHP-FPM para usar Unix socket
+RUN sed -i "s|listen = 127.0.0.1:9000|listen = /var/run/php-fpm/php-fpm.sock|g" /usr/local/etc/php-fpm.d/www.conf
+RUN echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf
+RUN echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf
+RUN echo "listen.mode = 0660" >> /usr/local/etc/php-fpm.d/www.conf
 
-# Install Composer dependencies (production)
-RUN composer install --optimize-autoloader --no-dev
+# Criar arquivo .env se não existir
+RUN if [ ! -f .env ]; then cp .env.example .env; fi
 
-# Copy .env.example to .env if it doesn't exist
-RUN if [ ! -f .env ]; then \
-    cp .env.example .env; \
-    fi
-
-# Generate application key if not set
+# Gerar chave da aplicação Laravel
 RUN php artisan key:generate --force
 
-# Create simple test HTML file for health checks
-RUN echo '<!DOCTYPE html>\n\
-<html>\n\
-<head>\n\
-    <title>Railway Test</title>\n\
-</head>\n\
-<body>\n\
-    <h1>Laravel Application is Running</h1>\n\
-    <p>If you can see this page, the server is operational.</p>\n\
-</body>\n\
-</html>' > /var/www/html/public/test.html
-
-# Create simple health txt file
+# Criar arquivos de saúde
 RUN echo "OK" > /var/www/html/public/health.txt
+RUN echo '<?php phpinfo(); ?>' > /var/www/html/public/info.php
 
-# Modify PHP settings
-RUN echo "memory_limit = 256M" > /usr/local/etc/php/conf.d/memory-limit.ini \
-    && echo "upload_max_filesize = 20M" > /usr/local/etc/php/conf.d/uploads.ini \
-    && echo "post_max_size = 21M" >> /usr/local/etc/php/conf.d/uploads.ini
-
-# Supervisor configuration
+# Configuração do Supervisor para gerenciar processos
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 \n\
@@ -138,191 +84,23 @@ stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# Create directory for the Unix socket
-RUN mkdir -p /var/run/php-fpm \
-    && chown -R www-data:www-data /var/run/php-fpm
+# Criar diretório do socket Unix do PHP-FPM
+RUN mkdir -p /var/run/php-fpm && chown -R www-data:www-data /var/run/php-fpm
 
-# Create start script with enhanced diagnostics
+# Criar script de inicialização
 RUN echo '#!/bin/bash \n\
-# Display environment information \n\
-echo "Railway environment information:" \n\
-echo "PORT=${PORT:-9000}" \n\
-echo "Host: $(hostname)" \n\
+echo "🚀 Iniciando container no Railway..." \n\
 \n\
-# Configure Nginx to use fixed PORT \n\
-echo "Configuring Nginx to listen on port 9000..." \n\
-cat > /etc/nginx/sites-available/default << EOF\n\
-server { \n\
-    listen 9000; \n\
-    server_name _; \n\
-    root /var/www/html/public; \n\
-    index index.php; \n\
-    client_max_body_size 100M; \n\
-    \n\
-    # Ajustes de buffer para evitar 502 Bad Gateway \n\
-    fastcgi_buffers 32 32k; \n\
-    fastcgi_buffer_size 64k; \n\
-    fastcgi_intercept_errors off; \n\
-    \n\
-    # Aumentar timeouts \n\
-    fastcgi_read_timeout 600; \n\
-    proxy_read_timeout 600; \n\
-    client_body_timeout 600; \n\
-    client_header_timeout 600; \n\
-    keepalive_timeout 600; \n\
-    send_timeout 600; \n\
-    \n\
-    # Log de depuração \n\
-    error_log /dev/stderr; \n\
-    access_log /dev/stdout; \n\
-    \n\
-    # Configuração especial para arquivos estáticos \n\
-    location ~* \\.(jpg|jpeg|png|gif|ico|css|js|html|txt)$ { \n\
-        expires 30d; \n\
-        add_header Cache-Control "public, no-transform"; \n\
-        try_files \\$uri =404; \n\
-    } \n\
-    \n\
-    # Permitir acesso ao arquivo info.php \n\
-    location = /info.php { \n\
-        try_files \\$uri =404; \n\
-    } \n\
-    \n\
-    # Permitir acesso ao arquivo test.html \n\
-    location = /test.html { \n\
-        try_files \\$uri =404; \n\
-    } \n\
-    \n\
-    # Adicionar arquivo de health check \n\
-    location = /health.txt { \n\
-        default_type text/plain; \n\
-        return 200 "OK"; \n\
-    } \n\
-    \n\
-    location / { \n\
-        # Headers CORS \n\
-        add_header '\''Access-Control-Allow-Origin'\'' '\''*'\'' always; \n\
-        add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\'' always; \n\
-        add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\'' always; \n\
-        \n\
-        # Handle OPTIONS preflight requests \n\
-        if (\\$request_method = '\''OPTIONS'\'') { \n\
-            add_header '\''Access-Control-Allow-Origin'\'' '\''*'\''; \n\
-            add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\''; \n\
-            add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\''; \n\
-            add_header '\''Access-Control-Max-Age'\'' 1728000; \n\
-            add_header '\''Content-Type'\'' '\''text/plain; charset=utf-8'\''; \n\
-            add_header '\''Content-Length'\'' 0; \n\
-            return 204; \n\
-        } \n\
-        \n\
-        try_files \\$uri \\$uri/ /index.php?\\$query_string; \n\
-    } \n\
-    \n\
-    location ~ \\.php$ { \n\
-        # Headers CORS para endpoints PHP \n\
-        add_header '\''Access-Control-Allow-Origin'\'' '\''*'\'' always; \n\
-        add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\'' always; \n\
-        add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\'' always; \n\
-        \n\
-        # Usando socket Unix em vez de TCP \n\
-        fastcgi_pass unix:/var/run/php-fpm/php-fpm.sock; \n\
-        fastcgi_index index.php; \n\
-        fastcgi_param SCRIPT_FILENAME \\$document_root\\$fastcgi_script_name; \n\
-        include fastcgi_params; \n\
-        fastcgi_connect_timeout 600; \n\
-        fastcgi_send_timeout 600; \n\
-        fastcgi_read_timeout 600; \n\
-        \n\
-        # Parameters para debug \n\
-        fastcgi_param PHP_VALUE "display_errors=On\\ndisplay_startup_errors=On\\nerror_reporting=E_ALL"; \n\
-    } \n\
-    \n\
-    location ~ /\\.(?!well-known).* { \n\
-        deny all; \n\
-    } \n\
-}\n\
-EOF\n\
-\n\
-# Configurar PHP-FPM para usar Unix socket em vez de TCP \n\
-echo "Configurando PHP-FPM para usar Unix socket..." \n\
-sed -i "s|listen = 127.0.0.1:9000|listen = /var/run/php-fpm/php-fpm.sock|g" /usr/local/etc/php-fpm.d/www.conf \n\
-echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \n\
-echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \n\
-echo "listen.mode = 0660" >> /usr/local/etc/php-fpm.d/www.conf \n\
-\n\
-# Configurar timeouts do PHP-FPM \n\
-echo "Configurando timeouts do PHP-FPM..." \n\
-echo "request_terminate_timeout = 600" >> /usr/local/etc/php-fpm.d/www.conf \n\
-echo "max_execution_time = 600" >> /usr/local/etc/php/conf.d/timeouts.ini \n\
-\n\
-# Test Nginx configuration \n\
-echo "Testing Nginx configuration..." \n\
+# Configurar Nginx para escutar na porta do Railway \n\
+sed -i "s|listen .*;|listen ${PORT:-9000};|g" /etc/nginx/sites-available/default \n\
 nginx -t \n\
 \n\
-# Update critical environment variables \n\
-echo "Atualizando variáveis de ambiente críticas no .env..." \n\
-sed -i "s|APP_URL=.*|APP_URL=https://app-backend-production-b390.up.railway.app|" .env \n\
-sed -i "s|SESSION_DOMAIN=.*|SESSION_DOMAIN=app-backend-production-b390.up.railway.app|" .env \n\
-sed -i "s|LOG_LEVEL=.*|LOG_LEVEL=debug|" .env \n\
-sed -i "s|APP_DEBUG=.*|APP_DEBUG=true|" .env \n\
-\n\
-# Modify .env file with database connection settings \n\
-echo "Updating .env file with database settings from environment variables..." \n\
-sed -i "s|DB_HOST=.*|DB_HOST=${DB_HOST:-postgres.railway.internal}|" .env \n\
-sed -i "s|DB_PORT=.*|DB_PORT=${DB_PORT:-5432}|" .env \n\
-sed -i "s|DB_DATABASE=.*|DB_DATABASE=${DB_DATABASE:-railway}|" .env \n\
-sed -i "s|DB_USERNAME=.*|DB_USERNAME=${DB_USERNAME:-postgres}|" .env \n\
-sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD:-cZkuwxYNUCrDuaWCccmZwMjvIZiRjyzF}|" .env \n\
-\n\
-# Tenta conectar ao banco de dados diretamente via PSQL \n\
-echo "Tentando conexão direta ao PostgreSQL..." \n\
-PGPASSWORD=${DB_PASSWORD:-cZkuwxYNUCrDuaWCccmZwMjvIZiRjyzF} psql -h hopper.proxy.rlwy.net -p 41149 -U postgres -d railway -c "SELECT 1" || echo "Não foi possível conectar ao PostgreSQL" \n\
-\n\
-# Create a simple PHP info file for diagnosis \n\
-echo "<?php phpinfo();" > /var/www/html/public/info.php \n\
-echo "Simple PHP info file created at public/info.php" \n\
-\n\
-# Run migrations with fallback \n\
-echo "Running database migrations..." \n\
-/var/www/html/deploy/migrate.sh || echo "Proceeding despite migration issues" \n\
-\n\
-# Create Laravel storage links \n\
-echo "Creating storage links..." \n\
-php artisan storage:link --force || echo "Storage link creation failed but continuing" \n\
-\n\
-# Clear caches for diagnostic \n\
-echo "Limpando caches para diagnóstico..." \n\
-php artisan config:clear \n\
-php artisan route:clear \n\
-php artisan view:clear \n\
-php artisan cache:clear \n\
-\n\
-# Display important paths and permissions \n\
-echo "Verificando permissões e estrutura de diretórios:" \n\
-ls -la /var/www/html \n\
-ls -la /var/www/html/public \n\
-ls -la /var/www/html/storage \n\
-\n\
-# Create directory for the Unix socket if it doesn'\''t exist \n\
-mkdir -p /var/run/php-fpm \n\
-chown -R www-data:www-data /var/run/php-fpm \n\
-\n\
-# Start supervisord \n\
-echo "Starting supervisord..." \n\
-/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf \n\
-\n\
-# Aguardar o início do Nginx e verificar a porta \n\
-sleep 5 \n\
-echo "Verificando portas em uso:" \n\
-netstat -tulpn | grep ":9000" \n\
-echo "Verificando se o socket Unix foi criado:" \n\
-ls -la /var/run/php-fpm/' \
-> /usr/local/bin/start-container \
-    && chmod +x /usr/local/bin/start-container
+# Iniciar Supervisor para gerenciar Nginx e PHP-FPM \n\
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' \
+> /usr/local/bin/start-container && chmod +x /usr/local/bin/start-container
 
-# Expose fixed port 9000
+# Expor porta dinâmica do Railway
 EXPOSE 9000
 
-# Start container
+# Iniciar container
 CMD ["/usr/local/bin/start-container"]
