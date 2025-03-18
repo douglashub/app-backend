@@ -22,7 +22,8 @@ RUN apt-get update && apt-get install -y \
     libxpm-dev \
     zlib1g-dev \
     libzip-dev \
-    dnsutils
+    dnsutils \
+    gettext-base
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -44,7 +45,8 @@ RUN mkdir -p /var/www/html/storage/framework/sessions \
     && mkdir -p /var/www/html/storage/framework/views \
     && mkdir -p /var/www/html/storage/framework/cache \
     && mkdir -p /var/www/html/bootstrap/cache \
-    && mkdir -p /var/www/html/deploy
+    && mkdir -p /var/www/html/deploy \
+    && mkdir -p /etc/nginx/templates
 
 # Copy application files
 COPY . .
@@ -84,16 +86,17 @@ RUN chmod +x /var/www/html/deploy/migrate.sh \
 # Install Composer dependencies (production)
 RUN composer install --optimize-autoloader --no-dev
 
-# Copy .env.example to .env
-COPY .env.example .env
+# Copy .env.example to .env if it doesn't exist
+RUN if [ ! -f .env ]; then \
+    cp .env.example .env; \
+    fi
 
-# Generate application key
+# Generate application key if not set
 RUN php artisan key:generate --force
 
-# Nginx configuration
-# Use 0.0.0.0:80 (instead of 0.0.0.0:$PORT) to avoid "invalid port" error
+# Create Nginx configuration template
 RUN echo 'server { \
-    listen 0.0.0.0:80; \
+    listen ${PORT:-80}; \
     server_name _; \
     root /var/www/html/public; \
     index index.php; \
@@ -106,7 +109,7 @@ RUN echo 'server { \
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name; \
         include fastcgi_params; \
     } \
-}' > /etc/nginx/sites-available/default
+}' > /etc/nginx/templates/default.conf.template
 
 # Supervisor configuration
 RUN echo "[supervisord]\n\
@@ -130,28 +133,65 @@ stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# Optional: DNS resolution check
-# RUN echo "Resolving postgres.railway.internal..." \
-#     && nslookup postgres.railway.internal || (echo "DNS resolution failed" && exit 1)
+# Create a healthcheck script
+RUN echo '#!/bin/sh \n\
+wget -q -O - http://localhost:${PORT:-80}/api/test || exit 1' > /usr/local/bin/healthcheck \
+    && chmod +x /usr/local/bin/healthcheck
 
-# Create start script
+# Create start script with expanded debugging
 RUN echo '#!/bin/bash \n\
+# Display environment information \n\
+echo "Railway environment information:" \n\
+echo "PORT=${PORT:-80}" \n\
+echo "Host: $(hostname)" \n\
+echo \n\
+\n\
+# Process Nginx template with PORT variable \n\
+echo "Configuring Nginx to listen on port ${PORT:-80}..." \n\
+envsubst "\$PORT" < /etc/nginx/templates/default.conf.template > /etc/nginx/sites-available/default \n\
+cat /etc/nginx/sites-available/default \n\
+\n\
+# Test Nginx configuration \n\
+echo "Testing Nginx configuration..." \n\
+nginx -t \n\
+\n\
+# Test database connection \n\
+echo "Testing database connection..." \n\
+php -r "try { \n\
+    \$dbconn = new PDO( \n\
+        \"pgsql:host=${DB_HOST:-postgres.railway.internal};port=${DB_PORT:-5432};dbname=${DB_DATABASE:-railway}\", \n\
+        \"${DB_USERNAME:-postgres}\", \n\
+        \"${DB_PASSWORD}\" \n\
+    ); \n\
+    echo \"Database connection successful\\n\"; \n\
+} catch (\\PDOException \$e) { \n\
+    echo \"Database connection failed: \" . \$e->getMessage() . \"\\n\"; \n\
+}" \n\
+\n\
 # Run migrations \n\
+echo "Running database migrations..." \n\
 /var/www/html/deploy/migrate.sh \n\
 \n\
+# Create Laravel storage links \n\
+echo "Creating storage links..." \n\
+php artisan storage:link --force \n\
+\n\
+# Cache configuration \n\
+echo "Caching configuration..." \n\
+php artisan config:cache \n\
+php artisan route:cache \n\
+\n\
 # Start supervisord \n\
+echo "Starting supervisord..." \n\
 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' \
 > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Display the contents of .env and .env.example after successful build (debug)
-RUN echo "Contents of .env:" \
-    && cat .env \
-    && echo "\nContents of .env.example:" \
-    && cat .env.example
+# Expose port based on PORT environment variable or default to 80
+EXPOSE ${PORT:-80}
 
-# Expose port 80 (inside the container)
-EXPOSE 80
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD /usr/local/bin/healthcheck
 
 # Start container
 CMD ["/usr/local/bin/start-container"]
