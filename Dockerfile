@@ -85,8 +85,11 @@ RUN chmod +x /var/www/html/deploy/migrate.sh \
 # Install Composer dependencies
 RUN composer install --optimize-autoloader --no-dev
 
+# Copy .env.example to .env
+COPY .env.example .env
+
 # Generate application key
-RUN php artisan key:generate
+RUN php artisan key:generate --force
 
 # Create nginx configuration
 RUN echo 'server { \
@@ -131,6 +134,12 @@ RUN echo '#!/bin/bash \n\
 # Start supervisord \n\
 /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
+
+# Display the contents of .env and .env.example after successful build
+RUN echo "Contents of .env:" \
+    && cat .env \
+    && echo "\nContents of .env.example:" \
+    && cat .env.example
 
 # Expose port
 EXPOSE $PORT
