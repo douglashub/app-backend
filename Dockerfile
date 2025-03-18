@@ -139,14 +139,14 @@ stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 RUN echo '#!/bin/bash \n\
 # Display environment information \n\
 echo "Railway environment information:" \n\
-echo "PORT=${PORT:-8080}" \n\
+echo "PORT=${PORT:-9000}" \n\
 echo "Host: $(hostname)" \n\
 \n\
 # Configure Nginx to use fixed PORT \n\
-echo "Configuring Nginx to listen on port 8080..." \n\
+echo "Configuring Nginx to listen on port 9000..." \n\
 cat > /etc/nginx/sites-available/default << EOF\n\
 server { \n\
-    listen 8080; \n\
+    listen 9000; \n\
     server_name _; \n\
     root /var/www/html/public; \n\
     index index.php; \n\
@@ -287,9 +287,9 @@ ls -la /var/www/html \n\
 ls -la /var/www/html/public \n\
 ls -la /var/www/html/storage \n\
 \n\
-# Check if port 8080 is already in use \n\
-echo "Verificando se a porta 8080 já está em uso:" \n\
-netstat -tulpn | grep 8080 || echo "Porta 8080 está livre" \n\
+# Check if port 9000 is already in use \n\
+echo "Verificando se a porta 9000 já está em uso:" \n\
+netstat -tulpn | grep 9000 || echo "Porta 9000 está livre" \n\
 \n\
 # Start supervisord \n\
 echo "Starting supervisord..." \n\
@@ -298,12 +298,12 @@ echo "Starting supervisord..." \n\
 # Aguardar o início do Nginx e verificar a porta \n\
 sleep 5 \n\
 echo "Verificando portas em uso:" \n\
-netstat -tulpn | grep -E ":8080|:9001"' \
+netstat -tulpn | grep -E ":9000|:9001"' \
 > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Expose fixed port 8080
-EXPOSE 8080
+# Expose fixed port 9000
+EXPOSE 9000
 
 # Start container
 CMD ["/usr/local/bin/start-container"]
