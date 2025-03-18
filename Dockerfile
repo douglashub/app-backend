@@ -1,6 +1,10 @@
+# Use the official PHP 8.2 FPM base image
 FROM php:8.2-fpm
 
-# Instalar dependências
+# Set working directory
+WORKDIR /var/www/html
+
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -13,36 +17,66 @@ RUN apt-get update && apt-get install -y \
     nginx \
     supervisor
 
-# Limpar cache
+# Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Instalar extensões PHP
+# Install PHP extensions
 RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd
 
-# Obter Composer mais recente
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Configurar diretório de trabalho
-WORKDIR /var/www/html
+# Create directory for configurations
+RUN mkdir -p /var/www/html/docker
 
-# Copiar código existente
+# Copy application files
 COPY . .
 
-# Instalar dependências do Composer
-RUN composer install --optimize-autoloader --no-dev
-
-# Configurar permissões
+# Set proper permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Configurar NGINX
-COPY docker/nginx.conf /etc/nginx/sites-available/default
-RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
+# Create nginx configuration
+RUN echo 'server { \
+    listen 0.0.0.0:$PORT; \
+    server_name _; \
+    root /var/www/html/public; \
+    index index.php; \
+    location / { \
+        try_files $uri $uri/ /index.php?$query_string; \
+    } \
+    location ~ \.php$ { \
+        fastcgi_pass 127.0.0.1:9000; \
+        fastcgi_index index.php; \
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name; \
+        include fastcgi_params; \
+    } \
+}' > /etc/nginx/sites-available/default
 
-# Configurar Supervisor
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Create supervisord configuration
+RUN echo '[supervisord] \
+nodaemon=true \
+\n\
+[program:php-fpm] \
+command=/usr/local/sbin/php-fpm \
+autostart=true \
+autorestart=true \
+\n\
+[program:nginx] \
+command=/usr/sbin/nginx -g "daemon off;" \
+autostart=true \
+autorestart=true' > /etc/supervisor/conf.d/supervisord.conf
 
-# Expor a porta
-EXPOSE 80
+# Install Composer dependencies
+RUN composer install --optimize-autoloader --no-dev
 
-# Iniciar Supervisor
+# Generate application key
+RUN php artisan key:generate
+
+# Run database migrations
+RUN php artisan migrate --force
+
+# Expose port
+EXPOSE $PORT
+
+# Start Supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -1,0 +1,35 @@
+# Versioning and dependency directories
+.git/
+.gitignore
+vendor/
+node_modules/
+
+# Environment files
+.env
+.env.example
+
+# Build output
+build/
+dist/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Development files
+.idea/
+.vscode/
+
+# Laravel specific
+/storage/*.key
+/vendor
+.env.backup
+.phpunit.result.cache
+storage/logs/
+storage/framework/sessions/
+storage/framework/views/
+storage/framework/cache/
+bootstrap/cache/
