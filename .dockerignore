@@ -3,11 +3,6 @@
 .gitignore
 vendor/
 node_modules/
-
-# Environment files
-.env
-.env.example
-
 # Build output
 build/
 dist/
