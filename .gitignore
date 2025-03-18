@@ -4,7 +4,6 @@
 /public/hot
 /public/storage
 /storage/*.key
-/storage/pail
 /vendor
 .env
 .env.backup
@@ -21,5 +20,21 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-project_structure.txt
 .DS_Store
+
+# Keep important framework directories
+!storage/framework/
+!storage/framework/cache/
+!storage/framework/sessions/
+!storage/framework/views/
+!bootstrap/cache/
+
+# Ignore specific files within framework directories
+storage/framework/cache/*
+!storage/framework/cache/.gitkeep
+storage/framework/sessions/*
+!storage/framework/sessions/.gitkeep
+storage/framework/views/*
+!storage/framework/views/.gitkeep
+bootstrap/cache/*
+!bootstrap/cache/.gitkeep

@@ -4,7 +4,7 @@ FROM php:8.2-fpm
 # Set working directory
 WORKDIR /var/www/html
 
-# Install system dependencies
+# Install system dependencies and PHP extensions dependencies
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -15,25 +15,43 @@ RUN apt-get update && apt-get install -y \
     unzip \
     libpq-dev \
     nginx \
-    supervisor
+    supervisor \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libwebp-dev \
+    libxpm-dev \
+    zlib1g-dev \
+    libzip-dev
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Configure and install PHP extensions with proper GD support
+RUN docker-php-ext-configure gd \
+        --with-freetype \
+        --with-jpeg \
+        --with-webp \
+        --with-xpm
+
 # Install PHP extensions
-RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd
+RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Create directory for configurations
-RUN mkdir -p /var/www/html/docker
+# Create necessary directories
+RUN mkdir -p /var/www/html/docker \
+    && mkdir -p /var/www/html/bootstrap/cache \
+    && mkdir -p /var/www/html/storage
 
 # Copy application files
 COPY . .
 
 # Set proper permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chown -R www-data:www-data \
+    /var/www/html/storage \
+    /var/www/html/bootstrap/cache \
+    /var/www/html/public
 
 # Create nginx configuration
 RUN echo 'server { \
