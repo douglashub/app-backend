@@ -117,63 +117,66 @@ stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# Database testing script
-RUN echo '#!/bin/bash\n\
-# Try to connect to PostgreSQL with provided credentials\n\
-PGPASSWORD=${PGPASSWORD} psql -h ${PGHOST:-postgres.railway.internal} -p ${PGPORT:-5432} -U ${PGUSER:-postgres} -d ${PGDATABASE:-railway} -c "SELECT 1;"' > /usr/local/bin/test-db.sh \
-    && chmod +x /usr/local/bin/test-db.sh
-
 # Create start script with enhanced DB diagnostics
 RUN echo '#!/bin/bash \n\
 # Display environment information \n\
 echo "Railway environment information:" \n\
-echo "PORT=${PORT:-8080}" \n\
+echo "PORT=${PORT:-9000}" \n\
 echo "Host: $(hostname)" \n\
 \n\
-# Configure Nginx hardcoding the port \n\
-echo "Configuring Nginx to listen on port ${PORT:-8080}..." \n\
+# Configure Nginx hardcoding the port to 9000 \n\
+echo "Configuring Nginx to listen on port 9000..." \n\
 cat > /etc/nginx/sites-available/default << EOF\n\
 server { \n\
-    listen ${PORT:-8080}; \n\
+    listen 9000; \n\
     server_name _; \n\
     root /var/www/html/public; \n\
     index index.php; \n\
+    client_max_body_size 100M; \n\
+    \n\
+    # Aumentar timeouts \n\
+    fastcgi_read_timeout 300; \n\
+    proxy_read_timeout 300; \n\
+    \n\
+    # Log de depuração \n\
+    error_log /dev/stderr debug; \n\
+    access_log /dev/stdout; \n\
     \n\
     location / { \n\
         try_files \\$uri \\$uri/ /index.php?\\$query_string; \n\
     } \n\
     \n\
     location ~ \\.php$ { \n\
-        fastcgi_pass 127.0.0.1:9000; \n\
+        fastcgi_pass 127.0.0.1:9001; \n\
         fastcgi_index index.php; \n\
         fastcgi_param SCRIPT_FILENAME \\$document_root\\$fastcgi_script_name; \n\
         include fastcgi_params; \n\
+        fastcgi_connect_timeout 300; \n\
+        fastcgi_send_timeout 300; \n\
+        fastcgi_read_timeout 300; \n\
     } \n\
 }\n\
 EOF\n\
+\n\
+# Modifica o PHP-FPM para usar a porta 9001 para evitar conflito com o Nginx \n\
+echo "Configurando PHP-FPM para usar a porta 9001..." \n\
+sed -i "s/listen = 127.0.0.1:9000/listen = 127.0.0.1:9001/g" /usr/local/etc/php-fpm.d/www.conf \n\
 \n\
 # Test Nginx configuration \n\
 echo "Testing Nginx configuration..." \n\
 nginx -t \n\
 \n\
-# Database diagnostic tests \n\
-echo "Performing database connectivity diagnostics..." \n\
-echo "Host resolution test:" \n\
-getent hosts postgres.railway.internal || echo "Cannot resolve postgres.railway.internal" \n\
-getent hosts hopper.proxy.rlwy.net || echo "Cannot resolve hopper.proxy.rlwy.net" \n\
-getent hosts postgres || echo "Cannot resolve postgres" \n\
-\n\
-# Try direct connection to Postgres \n\
-echo "Testing PostgreSQL connection..." \n\
-/usr/local/bin/test-db.sh || echo "PostgreSQL connection test failed" \n\
-\n\
 # Modify .env file with database connection settings \n\
 echo "Updating .env file with database settings from environment variables..." \n\
-sed -i "s/DB_HOST=.*/DB_HOST=${PGHOST:-postgres.railway.internal}/" .env \n\
-sed -i "s/DB_PORT=.*/DB_PORT=${PGPORT:-5432}/" .env \n\
-sed -i "s/DB_DATABASE=.*/DB_DATABASE=${PGDATABASE:-railway}/" .env \n\
-sed -i "s/DB_USERNAME=.*/DB_USERNAME=${PGUSER:-postgres}/" .env \n\
-sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${PGPASSWORD:-cZkuwxYNUCrDuaWCccmZwMjvIZiRjyzF}|" .env \n\
+sed -i "s|DB_HOST=.*|DB_HOST=${DB_HOST:-postgres.railway.internal}|" .env \n\
+sed -i "s|DB_PORT=.*|DB_PORT=${DB_PORT:-5432}|" .env \n\
+sed -i "s|DB_DATABASE=.*|DB_DATABASE=${DB_DATABASE:-railway}|" .env \n\
+sed -i "s|DB_USERNAME=.*|DB_USERNAME=${DB_USERNAME:-postgres}|" .env \n\
+sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD:-cZkuwxYNUCrDuaWCccmZwMjvIZiRjyzF}|" .env \n\
+\n\
+# Tenta conectar ao banco de dados diretamente via PSQL \n\
+echo "Tentando conexão direta ao PostgreSQL..." \n\
+PGPASSWORD=${DB_PASSWORD:-cZkuwxYNUCrDuaWCccmZwMjvIZiRjyzF} psql -h hopper.proxy.rlwy.net -p 41149 -U postgres -d railway -c "SELECT 1" || echo "Não foi possível conectar ao PostgreSQL" \n\
 \n\
 # Run migrations with fallback \n\
 echo "Running database migrations..." \n\
@@ -185,8 +188,17 @@ php artisan storage:link --force || echo "Storage link creation failed but conti
 \n\
 # Cache configuration \n\
 echo "Caching configuration..." \n\
+php artisan config:clear \n\
 php artisan config:cache || echo "Config caching failed but continuing" \n\
+php artisan route:clear \n\
 php artisan route:cache || echo "Route caching failed but continuing" \n\
+php artisan optimize \n\
+\n\
+# Display important paths and permissions \n\
+echo "Verificando permissões e estrutura de diretórios:" \n\
+ls -la /var/www/html \n\
+ls -la /var/www/html/public \n\
+ls -la /var/www/html/storage \n\
 \n\
 # Start supervisord \n\
 echo "Starting supervisord..." \n\
@@ -194,8 +206,8 @@ echo "Starting supervisord..." \n\
 > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Expose port
-EXPOSE 8080
+# Expose port 9000 (the port Railway is expecting)
+EXPOSE 9000
 
 # Start container
 CMD ["/usr/local/bin/start-container"]
