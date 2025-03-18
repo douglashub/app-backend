@@ -96,6 +96,23 @@ RUN if [ ! -f .env ]; then \
 # Generate application key if not set
 RUN php artisan key:generate --force
 
+# Create simple test HTML file for health checks
+RUN echo '<!DOCTYPE html>\n\
+<html>\n\
+<head>\n\
+    <title>Railway Test</title>\n\
+</head>\n\
+<body>\n\
+    <h1>Laravel Application is Running</h1>\n\
+    <p>If you can see this page, the server is operational.</p>\n\
+</body>\n\
+</html>' > /var/www/html/public/test.html
+
+# Modify PHP settings
+RUN echo "memory_limit = 256M" > /usr/local/etc/php/conf.d/memory-limit.ini \
+    && echo "upload_max_filesize = 20M" > /usr/local/etc/php/conf.d/uploads.ini \
+    && echo "post_max_size = 21M" >> /usr/local/etc/php/conf.d/uploads.ini
+
 # Supervisor configuration
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
@@ -118,35 +135,56 @@ stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# Create start script with enhanced DB diagnostics
+# Create start script with enhanced diagnostics
 RUN echo '#!/bin/bash \n\
 # Display environment information \n\
 echo "Railway environment information:" \n\
 echo "PORT=${PORT:-8080}" \n\
 echo "Host: $(hostname)" \n\
 \n\
-# Configure Nginx to use dynamic PORT variable \n\
-echo "Configuring Nginx to listen on port ${PORT:-8080}..." \n\
+# Configure Nginx to use fixed PORT \n\
+echo "Configuring Nginx to listen on port 8080..." \n\
 cat > /etc/nginx/sites-available/default << EOF\n\
 server { \n\
-    listen ${PORT:-8080}; \n\
+    listen 8080; \n\
     server_name _; \n\
     root /var/www/html/public; \n\
     index index.php; \n\
     client_max_body_size 100M; \n\
     \n\
     # Ajustes de buffer para evitar 502 Bad Gateway \n\
-    fastcgi_buffers 16 16k; \n\
-    fastcgi_buffer_size 32k; \n\
+    fastcgi_buffers 32 32k; \n\
+    fastcgi_buffer_size 64k; \n\
     fastcgi_intercept_errors off; \n\
     \n\
     # Aumentar timeouts \n\
-    fastcgi_read_timeout 300; \n\
-    proxy_read_timeout 300; \n\
+    fastcgi_read_timeout 600; \n\
+    proxy_read_timeout 600; \n\
+    client_body_timeout 600; \n\
+    client_header_timeout 600; \n\
+    keepalive_timeout 600; \n\
+    send_timeout 600; \n\
     \n\
     # Log de depuração \n\
     error_log /dev/stderr; \n\
     access_log /dev/stdout; \n\
+    \n\
+    # Configuração especial para arquivos estáticos \n\
+    location ~* \\.(jpg|jpeg|png|gif|ico|css|js|html)$ { \n\
+        expires 30d; \n\
+        add_header Cache-Control "public, no-transform"; \n\
+        try_files \\$uri =404; \n\
+    } \n\
+    \n\
+    # Permitir acesso ao arquivo info.php \n\
+    location = /info.php { \n\
+        try_files \\$uri =404; \n\
+    } \n\
+    \n\
+    # Permitir acesso ao arquivo test.html \n\
+    location = /test.html { \n\
+        try_files \\$uri =404; \n\
+    } \n\
     \n\
     location / { \n\
         # Headers CORS \n\
@@ -178,9 +216,12 @@ server { \n\
         fastcgi_index index.php; \n\
         fastcgi_param SCRIPT_FILENAME \\$document_root\\$fastcgi_script_name; \n\
         include fastcgi_params; \n\
-        fastcgi_connect_timeout 300; \n\
-        fastcgi_send_timeout 300; \n\
-        fastcgi_read_timeout 300; \n\
+        fastcgi_connect_timeout 600; \n\
+        fastcgi_send_timeout 600; \n\
+        fastcgi_read_timeout 600; \n\
+        \n\
+        # Parameters para debug \n\
+        fastcgi_param PHP_VALUE "display_errors=On\\ndisplay_startup_errors=On\\nerror_reporting=E_ALL"; \n\
     } \n\
     \n\
     location ~ /\\.(?!well-known).* { \n\
@@ -193,9 +234,21 @@ EOF\n\
 echo "Configurando PHP-FPM para usar a porta 9001..." \n\
 sed -i "s/listen = 127.0.0.1:9000/listen = 127.0.0.1:9001/g" /usr/local/etc/php-fpm.d/www.conf \n\
 \n\
+# Configurar timeouts do PHP-FPM \n\
+echo "Configurando timeouts do PHP-FPM..." \n\
+echo "request_terminate_timeout = 600" >> /usr/local/etc/php-fpm.d/www.conf \n\
+echo "max_execution_time = 600" >> /usr/local/etc/php/conf.d/timeouts.ini \n\
+\n\
 # Test Nginx configuration \n\
 echo "Testing Nginx configuration..." \n\
 nginx -t \n\
+\n\
+# Update critical environment variables \n\
+echo "Atualizando variáveis de ambiente críticas no .env..." \n\
+sed -i "s|APP_URL=.*|APP_URL=https://app-backend-production-b390.up.railway.app|" .env \n\
+sed -i "s|SESSION_DOMAIN=.*|SESSION_DOMAIN=app-backend-production-b390.up.railway.app|" .env \n\
+sed -i "s|LOG_LEVEL=.*|LOG_LEVEL=debug|" .env \n\
+sed -i "s|APP_DEBUG=.*|APP_DEBUG=true|" .env \n\
 \n\
 # Modify .env file with database connection settings \n\
 echo "Updating .env file with database settings from environment variables..." \n\
@@ -209,6 +262,10 @@ sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD:-cZkuwxYNUCrDuaWCccmZwMjvIZiR
 echo "Tentando conexão direta ao PostgreSQL..." \n\
 PGPASSWORD=${DB_PASSWORD:-cZkuwxYNUCrDuaWCccmZwMjvIZiRjyzF} psql -h hopper.proxy.rlwy.net -p 41149 -U postgres -d railway -c "SELECT 1" || echo "Não foi possível conectar ao PostgreSQL" \n\
 \n\
+# Create a simple PHP info file for diagnosis \n\
+echo "<?php phpinfo();" > /var/www/html/public/info.php \n\
+echo "Simple PHP info file created at public/info.php" \n\
+\n\
 # Run migrations with fallback \n\
 echo "Running database migrations..." \n\
 /var/www/html/deploy/migrate.sh || echo "Proceeding despite migration issues" \n\
@@ -217,19 +274,22 @@ echo "Running database migrations..." \n\
 echo "Creating storage links..." \n\
 php artisan storage:link --force || echo "Storage link creation failed but continuing" \n\
 \n\
-# Cache configuration \n\
-echo "Caching configuration..." \n\
+# Clear caches for diagnostic \n\
+echo "Limpando caches para diagnóstico..." \n\
 php artisan config:clear \n\
-php artisan config:cache || echo "Config caching failed but continuing" \n\
 php artisan route:clear \n\
-php artisan route:cache || echo "Route caching failed but continuing" \n\
-php artisan optimize \n\
+php artisan view:clear \n\
+php artisan cache:clear \n\
 \n\
 # Display important paths and permissions \n\
 echo "Verificando permissões e estrutura de diretórios:" \n\
 ls -la /var/www/html \n\
 ls -la /var/www/html/public \n\
 ls -la /var/www/html/storage \n\
+\n\
+# Check if port 8080 is already in use \n\
+echo "Verificando se a porta 8080 já está em uso:" \n\
+netstat -tulpn | grep 8080 || echo "Porta 8080 está livre" \n\
 \n\
 # Start supervisord \n\
 echo "Starting supervisord..." \n\
@@ -238,12 +298,12 @@ echo "Starting supervisord..." \n\
 # Aguardar o início do Nginx e verificar a porta \n\
 sleep 5 \n\
 echo "Verificando portas em uso:" \n\
-netstat -tulpn | grep -E \":${PORT:-8080}|:9001\"' \
+netstat -tulpn | grep -E ":8080|:9001"' \
 > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Expose the same port that Railway provides
-EXPOSE ${PORT:-8080}
+# Expose fixed port 8080
+EXPOSE 8080
 
 # Start container
 CMD ["/usr/local/bin/start-container"]
