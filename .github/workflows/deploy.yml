@@ -1,0 +1,64 @@
+name: Deploy Laravel API to DigitalOcean
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install SSH Key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            
+            echo "🚀 Atualizando código no servidor..."
+            if [ -d "/var/www/laravel-api" ]; then
+              cd /var/www/laravel-api
+              git reset --hard
+              git pull origin main
+            else
+              git clone git@github.com:micaelparadox/api-laravel.git /var/www/laravel-api
+              cd /var/www/laravel-api
+            fi
+
+            echo "📦 Instalando dependências..."
+            docker-compose exec -T app composer install --no-dev --optimize-autoloader
+            docker-compose exec -T app npm install && npm run build
+
+            echo "🔑 Garantindo chave do Laravel..."
+            docker-compose exec -T app php artisan key:generate --force
+
+            echo "🔄 Limpando cache..."
+            docker-compose exec -T app php artisan config:cache
+            docker-compose exec -T app php artisan route:cache
+            docker-compose exec -T app php artisan view:cache
+
+            echo "🎯 Rodando migrações..."
+            docker-compose exec -T app php artisan migrate --force
+
+            echo "🐳 Reiniciando containers..."
+            docker-compose down
+            docker-compose pull
+            docker-compose up -d --build
+
+            echo "🔄 Reiniciando Nginx..."
+            systemctl reload nginx
+
+            echo "✅ Deploy concluído com sucesso!"
