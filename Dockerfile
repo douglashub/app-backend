@@ -25,7 +25,8 @@ RUN apt-get update && apt-get install -y \
     dnsutils \
     iputils-ping \
     postgresql-client \
-    gettext-base
+    gettext-base \
+    net-tools
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -121,14 +122,14 @@ stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 RUN echo '#!/bin/bash \n\
 # Display environment information \n\
 echo "Railway environment information:" \n\
-echo "PORT=${PORT:-9000}" \n\
+echo "PORT=${PORT:-8080}" \n\
 echo "Host: $(hostname)" \n\
 \n\
-# Configure Nginx hardcoding the port to 9000 \n\
-echo "Configuring Nginx to listen on port 9000..." \n\
+# Configure Nginx to use dynamic PORT variable \n\
+echo "Configuring Nginx to listen on port ${PORT:-8080}..." \n\
 cat > /etc/nginx/sites-available/default << EOF\n\
 server { \n\
-    listen 9000; \n\
+    listen ${PORT:-8080}; \n\
     server_name _; \n\
     root /var/www/html/public; \n\
     index index.php; \n\
@@ -139,7 +140,7 @@ server { \n\
     proxy_read_timeout 300; \n\
     \n\
     # Log de depuração \n\
-    error_log /dev/stderr debug; \n\
+    error_log /dev/stderr; \n\
     access_log /dev/stdout; \n\
     \n\
     location / { \n\
@@ -154,6 +155,10 @@ server { \n\
         fastcgi_connect_timeout 300; \n\
         fastcgi_send_timeout 300; \n\
         fastcgi_read_timeout 300; \n\
+    } \n\
+    \n\
+    location ~ /\\.(?!well-known).* { \n\
+        deny all; \n\
     } \n\
 }\n\
 EOF\n\
@@ -202,12 +207,17 @@ ls -la /var/www/html/storage \n\
 \n\
 # Start supervisord \n\
 echo "Starting supervisord..." \n\
-/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' \
+/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf \n\
+\n\
+# Aguardar o início do Nginx e verificar a porta \n\
+sleep 5 \n\
+echo "Verificando portas em uso:" \n\
+netstat -tulpn | grep -E \":${PORT:-8080}|:9001\"' \
 > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Expose port 9000 (the port Railway is expecting)
-EXPOSE 9000
+# Expose the same port that Railway provides
+EXPOSE ${PORT:-8080}
 
 # Start container
 CMD ["/usr/local/bin/start-container"]
