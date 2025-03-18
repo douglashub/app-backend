@@ -148,27 +148,32 @@ server { \n\
     error_log /dev/stderr; \n\
     access_log /dev/stdout; \n\
     \n\
-    # Headers CORS \n\
-    add_header '\''Access-Control-Allow-Origin'\'' '\''*'\'' always; \n\
-    add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\'' always; \n\
-    add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\'' always; \n\
-    \n\
-    # Handle OPTIONS preflight requests \n\
-    if (\\$request_method = '\''OPTIONS'\'') { \n\
-        add_header '\''Access-Control-Allow-Origin'\'' '\''*'\''; \n\
-        add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\''; \n\
-        add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\''; \n\
-        add_header '\''Access-Control-Max-Age'\'' 1728000; \n\
-        add_header '\''Content-Type'\'' '\''text/plain; charset=utf-8'\''; \n\
-        add_header '\''Content-Length'\'' 0; \n\
-        return 204; \n\
-    } \n\
-    \n\
     location / { \n\
+        # Headers CORS \n\
+        add_header '\''Access-Control-Allow-Origin'\'' '\''*'\'' always; \n\
+        add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\'' always; \n\
+        add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\'' always; \n\
+        \n\
+        # Handle OPTIONS preflight requests \n\
+        if (\\$request_method = '\''OPTIONS'\'') { \n\
+            add_header '\''Access-Control-Allow-Origin'\'' '\''*'\''; \n\
+            add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\''; \n\
+            add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\''; \n\
+            add_header '\''Access-Control-Max-Age'\'' 1728000; \n\
+            add_header '\''Content-Type'\'' '\''text/plain; charset=utf-8'\''; \n\
+            add_header '\''Content-Length'\'' 0; \n\
+            return 204; \n\
+        } \n\
+        \n\
         try_files \\$uri \\$uri/ /index.php?\\$query_string; \n\
     } \n\
     \n\
     location ~ \\.php$ { \n\
+        # Headers CORS para endpoints PHP \n\
+        add_header '\''Access-Control-Allow-Origin'\'' '\''*'\'' always; \n\
+        add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\'' always; \n\
+        add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\'' always; \n\
+        \n\
         fastcgi_pass 127.0.0.1:9001; \n\
         fastcgi_index index.php; \n\
         fastcgi_param SCRIPT_FILENAME \\$document_root\\$fastcgi_script_name; \n\
