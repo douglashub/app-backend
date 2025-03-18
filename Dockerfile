@@ -123,8 +123,8 @@ autostart=true \
 autorestart=true' > /etc/supervisor/conf.d/supervisord.conf
 
 # DNS resolution check
-RUN echo "Resolving postgres.railway.internal..." \
-    && nslookup postgres.railway.internal || (echo "DNS resolution failed" && exit 1)
+#RUN echo "Resolving postgres.railway.internal..." \
+#    && nslookup postgres.railway.internal || (echo "DNS resolution failed" && exit 1)
 
 # Create start script
 RUN echo '#!/bin/bash \n\
