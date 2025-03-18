@@ -54,8 +54,9 @@ COPY . .
 RUN chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache public
 
-# Criar arquivo de configuração Nginx
-RUN echo 'server {
+# Criar arquivo de configuração Nginx usando cat em vez de echo
+RUN cat > /etc/nginx/sites-available/default << 'EOL'
+server {
     listen ${PORT:-9000};
     server_name _;
 
@@ -82,7 +83,7 @@ RUN echo 'server {
     access_log /dev/stdout;
 
     # Configuração especial para arquivos estáticos
-    location ~* \\.(jpg|jpeg|png|gif|ico|css|js|html|txt)$ {
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|html|txt)$ {
         expires 30d;
         add_header Cache-Control "public, no-transform";
         try_files $uri =404;
@@ -106,29 +107,29 @@ RUN echo 'server {
 
     location / {
         # Headers CORS
-        add_header '"'"'Access-Control-Allow-Origin'"'"' '"'"'*'"'"' always;
-        add_header '"'"'Access-Control-Allow-Methods'"'"' '"'"'GET, POST, OPTIONS, PUT, DELETE'"'"' always;
-        add_header '"'"'Access-Control-Allow-Headers'"'"' '"'"'Origin, X-Requested-With, Content-Type, Accept, Authorization'"'"' always;
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+        add_header 'Access-Control-Allow-Headers' 'Origin, X-Requested-With, Content-Type, Accept, Authorization' always;
 
         # Handle OPTIONS preflight requests
-        if ($request_method = '"'"'OPTIONS'"'"') {
-            add_header '"'"'Access-Control-Allow-Origin'"'"' '"'"'*'"'"';
-            add_header '"'"'Access-Control-Allow-Methods'"'"' '"'"'GET, POST, OPTIONS, PUT, DELETE'"'"';
-            add_header '"'"'Access-Control-Allow-Headers'"'"' '"'"'Origin, X-Requested-With, Content-Type, Accept, Authorization'"'"';
-            add_header '"'"'Access-Control-Max-Age'"'"' 1728000;
-            add_header '"'"'Content-Type'"'"' '"'"'text/plain; charset=utf-8'"'"';
-            add_header '"'"'Content-Length'"'"' 0;
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '*';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+            add_header 'Access-Control-Allow-Headers' 'Origin, X-Requested-With, Content-Type, Accept, Authorization';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain; charset=utf-8';
+            add_header 'Content-Length' 0;
             return 204;
         }
 
         try_files $uri $uri/ /index.php?$query_string;
     }
 
-    location ~ \\.php$ {
+    location ~ \.php$ {
         # Headers CORS para endpoints PHP
-        add_header '"'"'Access-Control-Allow-Origin'"'"' '"'"'*'"'"' always;
-        add_header '"'"'Access-Control-Allow-Methods'"'"' '"'"'GET, POST, OPTIONS, PUT, DELETE'"'"' always;
-        add_header '"'"'Access-Control-Allow-Headers'"'"' '"'"'Origin, X-Requested-With, Content-Type, Accept, Authorization'"'"' always;
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+        add_header 'Access-Control-Allow-Headers' 'Origin, X-Requested-With, Content-Type, Accept, Authorization' always;
 
         # Usando socket Unix em vez de TCP
         fastcgi_pass unix:/var/run/php-fpm/php-fpm.sock;
@@ -140,14 +141,15 @@ RUN echo 'server {
         fastcgi_read_timeout 600;
 
         # Parameters para debug
-        fastcgi_param PHP_VALUE "display_errors=On\\ndisplay_startup_errors=On\\nerror_reporting=E_ALL";
+        fastcgi_param PHP_VALUE "display_errors=On\ndisplay_startup_errors=On\nerror_reporting=E_ALL";
     }
 
     # Bloquear acesso a arquivos ocultos, como .env
-    location ~ /\\.(?!well-known).* {
+    location ~ /\.(?!well-known).* {
         deny all;
     }
-}' > /etc/nginx/sites-available/default
+}
+EOL
 
 # Configurar PHP-FPM para usar Unix socket
 RUN sed -i "s|listen = 127.0.0.1:9000|listen = /var/run/php-fpm/php-fpm.sock|g" /usr/local/etc/php-fpm.d/www.conf \
@@ -170,68 +172,74 @@ RUN echo "OK" > /var/www/html/public/health.txt \
     && echo '<?php phpinfo();' > /var/www/html/public/info.php \
     && echo '<!DOCTYPE html><html><head><title>Teste</title></head><body><h1>Aplicação Laravel Rodando!</h1></body></html>' > /var/www/html/public/test.html
 
-# Configuração do Supervisor para gerenciar processos
-RUN echo "[supervisord]\n\
-nodaemon=true\n\
-\n\
-[program:php-fpm]\n\
-command=/usr/local/sbin/php-fpm\n\
-autostart=true\n\
-autorestart=true\n\
-stdout_logfile=/dev/stdout\n\
-stdout_logfile_maxbytes=0\n\
-stderr_logfile=/dev/stderr\n\
-stderr_logfile_maxbytes=0\n\
-\n\
-[program:nginx]\n\
-command=/usr/sbin/nginx -g 'daemon off;'\n\
-autostart=true\n\
-autorestart=true\n\
-stdout_logfile=/dev/stdout\n\
-stdout_logfile_maxbytes=0\n\
-stderr_logfile=/dev/stderr\n\
-stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
+# Configuração do Supervisor
+RUN cat > /etc/supervisor/conf.d/supervisord.conf << 'EOL'
+[supervisord]
+nodaemon=true
+
+[program:php-fpm]
+command=/usr/local/sbin/php-fpm
+autostart=true
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+
+[program:nginx]
+command=/usr/sbin/nginx -g 'daemon off;'
+autostart=true
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+EOL
 
 # Criar diretório do socket Unix do PHP-FPM
 RUN mkdir -p /var/run/php-fpm && chown -R www-data:www-data /var/run/php-fpm
 
 # Criar script de inicialização
-RUN echo '#!/bin/bash \n\
-echo "🚀 Iniciando container no Railway..." \n\
-\n\
-# Configurar a porta do Nginx dinamicamente \n\
-sed -i "s|listen .*;|listen ${PORT:-9000};|g" /etc/nginx/sites-available/default \n\
-\n\
-# Atualizar variáveis de ambiente críticas \n\
-sed -i "s|APP_URL=.*|APP_URL=https://app-backend-production-b390.up.railway.app|" .env \n\
-sed -i "s|SESSION_DOMAIN=.*|SESSION_DOMAIN=app-backend-production-b390.up.railway.app|" .env \n\
-sed -i "s|LOG_LEVEL=.*|LOG_LEVEL=debug|" .env \n\
-sed -i "s|APP_DEBUG=.*|APP_DEBUG=true|" .env \n\
-\n\
-# Atualizar configurações de banco de dados \n\
-sed -i "s|DB_HOST=.*|DB_HOST=${DB_HOST:-postgres.railway.internal}|" .env \n\
-sed -i "s|DB_PORT=.*|DB_PORT=${DB_PORT:-5432}|" .env \n\
-sed -i "s|DB_DATABASE=.*|DB_DATABASE=${DB_DATABASE:-railway}|" .env \n\
-sed -i "s|DB_USERNAME=.*|DB_USERNAME=${DB_USERNAME:-postgres}|" .env \n\
-sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD}|" .env \n\
-\n\
-# Verificar configuração do Nginx \n\
-echo "Testando configuração do Nginx..." \n\
-nginx -t \n\
-\n\
-# Limpar caches Laravel \n\
-php artisan config:clear \n\
-php artisan route:clear \n\
-php artisan view:clear \n\
-php artisan cache:clear \n\
-\n\
-# Criar diretório para socket se não existir \n\
-mkdir -p /var/run/php-fpm \n\
-chown -R www-data:www-data /var/run/php-fpm \n\
-\n\
-echo "Iniciando supervisord..." \n\
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' \
-> /usr/local/bin/start-container && chmod +x /usr/local/bin/start-container
+RUN cat > /usr/local/bin/start-container << 'EOL'
+#!/bin/bash
+echo "🚀 Iniciando container no Railway..."
+
+# Configurar a porta do Nginx dinamicamente
+sed -i "s|listen .*;|listen ${PORT:-9000};|g" /etc/nginx/sites-available/default
+
+# Atualizar variáveis de ambiente críticas
+sed -i "s|APP_URL=.*|APP_URL=https://app-backend-production-b390.up.railway.app|" .env
+sed -i "s|SESSION_DOMAIN=.*|SESSION_DOMAIN=app-backend-production-b390.up.railway.app|" .env
+sed -i "s|LOG_LEVEL=.*|LOG_LEVEL=debug|" .env
+sed -i "s|APP_DEBUG=.*|APP_DEBUG=true|" .env
+
+# Atualizar configurações de banco de dados
+sed -i "s|DB_HOST=.*|DB_HOST=${DB_HOST:-postgres.railway.internal}|" .env
+sed -i "s|DB_PORT=.*|DB_PORT=${DB_PORT:-5432}|" .env
+sed -i "s|DB_DATABASE=.*|DB_DATABASE=${DB_DATABASE:-railway}|" .env
+sed -i "s|DB_USERNAME=.*|DB_USERNAME=${DB_USERNAME:-postgres}|" .env
+sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${DB_PASSWORD}|" .env
+
+# Verificar configuração do Nginx
+echo "Testando configuração do Nginx..."
+nginx -t
+
+# Limpar caches Laravel
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+php artisan cache:clear
+
+# Criar diretório para socket se não existir
+mkdir -p /var/run/php-fpm
+chown -R www-data:www-data /var/run/php-fpm
+
+echo "Iniciando supervisord..."
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+EOL
+
+# Tornar o script executável
+RUN chmod +x /usr/local/bin/start-container
 
 # Expor porta dinâmica do Railway
 EXPOSE 9000
