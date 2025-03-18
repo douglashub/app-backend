@@ -108,6 +108,9 @@ RUN echo '<!DOCTYPE html>\n\
 </body>\n\
 </html>' > /var/www/html/public/test.html
 
+# Create simple health txt file
+RUN echo "OK" > /var/www/html/public/health.txt
+
 # Modify PHP settings
 RUN echo "memory_limit = 256M" > /usr/local/etc/php/conf.d/memory-limit.ini \
     && echo "upload_max_filesize = 20M" > /usr/local/etc/php/conf.d/uploads.ini \
@@ -134,6 +137,10 @@ stdout_logfile=/dev/stdout\n\
 stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
+
+# Create directory for the Unix socket
+RUN mkdir -p /var/run/php-fpm \
+    && chown -R www-data:www-data /var/run/php-fpm
 
 # Create start script with enhanced diagnostics
 RUN echo '#!/bin/bash \n\
@@ -170,7 +177,7 @@ server { \n\
     access_log /dev/stdout; \n\
     \n\
     # Configuração especial para arquivos estáticos \n\
-    location ~* \\.(jpg|jpeg|png|gif|ico|css|js|html)$ { \n\
+    location ~* \\.(jpg|jpeg|png|gif|ico|css|js|html|txt)$ { \n\
         expires 30d; \n\
         add_header Cache-Control "public, no-transform"; \n\
         try_files \\$uri =404; \n\
@@ -184,6 +191,12 @@ server { \n\
     # Permitir acesso ao arquivo test.html \n\
     location = /test.html { \n\
         try_files \\$uri =404; \n\
+    } \n\
+    \n\
+    # Adicionar arquivo de health check \n\
+    location = /health.txt { \n\
+        default_type text/plain; \n\
+        return 200 "OK"; \n\
     } \n\
     \n\
     location / { \n\
@@ -212,7 +225,8 @@ server { \n\
         add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\'' always; \n\
         add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\'' always; \n\
         \n\
-        fastcgi_pass 127.0.0.1:9001; \n\
+        # Usando socket Unix em vez de TCP \n\
+        fastcgi_pass unix:/var/run/php-fpm/php-fpm.sock; \n\
         fastcgi_index index.php; \n\
         fastcgi_param SCRIPT_FILENAME \\$document_root\\$fastcgi_script_name; \n\
         include fastcgi_params; \n\
@@ -230,9 +244,12 @@ server { \n\
 }\n\
 EOF\n\
 \n\
-# Modifica o PHP-FPM para usar a porta 9001 para evitar conflito com o Nginx \n\
-echo "Configurando PHP-FPM para usar a porta 9001..." \n\
-sed -i "s/listen = 127.0.0.1:9000/listen = 127.0.0.1:9001/g" /usr/local/etc/php-fpm.d/www.conf \n\
+# Configurar PHP-FPM para usar Unix socket em vez de TCP \n\
+echo "Configurando PHP-FPM para usar Unix socket..." \n\
+sed -i "s|listen = 127.0.0.1:9000|listen = /var/run/php-fpm/php-fpm.sock|g" /usr/local/etc/php-fpm.d/www.conf \n\
+echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \n\
+echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \n\
+echo "listen.mode = 0660" >> /usr/local/etc/php-fpm.d/www.conf \n\
 \n\
 # Configurar timeouts do PHP-FPM \n\
 echo "Configurando timeouts do PHP-FPM..." \n\
@@ -287,9 +304,9 @@ ls -la /var/www/html \n\
 ls -la /var/www/html/public \n\
 ls -la /var/www/html/storage \n\
 \n\
-# Check if port 9000 is already in use \n\
-echo "Verificando se a porta 9000 já está em uso:" \n\
-netstat -tulpn | grep 9000 || echo "Porta 9000 está livre" \n\
+# Create directory for the Unix socket if it doesn'\''t exist \n\
+mkdir -p /var/run/php-fpm \n\
+chown -R www-data:www-data /var/run/php-fpm \n\
 \n\
 # Start supervisord \n\
 echo "Starting supervisord..." \n\
@@ -298,7 +315,9 @@ echo "Starting supervisord..." \n\
 # Aguardar o início do Nginx e verificar a porta \n\
 sleep 5 \n\
 echo "Verificando portas em uso:" \n\
-netstat -tulpn | grep -E ":9000|:9001"' \
+netstat -tulpn | grep ":9000" \n\
+echo "Verificando se o socket Unix foi criado:" \n\
+ls -la /var/run/php-fpm/' \
 > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
