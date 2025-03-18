@@ -118,6 +118,11 @@ command=/usr/sbin/nginx -g "daemon off;" \
 autostart=true \
 autorestart=true' > /etc/supervisor/conf.d/supervisord.conf
 
+# Add these lines near the DNS resolution section
+RUN apt-get update && apt-get install -y dnsutils \
+    && echo "Resolving postgres.railway.internal..." \
+    && nslookup postgres.railway.internal || (echo "DNS resolution failed" && exit 1)
+
 # Create start script
 RUN echo '#!/bin/bash \n\
 # Run migrations \n\
