@@ -17,7 +17,9 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+          echo "Chave SSH configurada com sucesso!"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -28,19 +30,27 @@ jobs:
           script: |
             set -e
             
-            echo "Atualizando código..."
-            cd /var/www/laravel-api || git clone git@github.com:micaelparadox/api-laravel.git /var/www/laravel-api
+            echo "🔄 Atualizando código..."
+            if [ ! -d "/var/www/laravel-api" ]; then
+              git clone git@github.com:micaelparadox/api-laravel.git /var/www/laravel-api
+            fi
             cd /var/www/laravel-api
             git pull origin main
+            
+            echo "📦 Instalando dependências do Laravel..."
+            docker-compose exec -T app composer install --no-dev --optimize-autoloader
 
-            echo "Criando ambiente Docker..."
+            echo "⚡ Instalando pacotes do front-end..."
+            docker-compose exec -T app npm install && npm run build
+
+            echo "⚙️ Criando ambiente Docker..."
             docker-compose down
             docker-compose up -d --build
 
-            echo "Rodando migrações..."
+            echo "📊 Rodando migrações..."
             docker-compose exec -T app php artisan migrate --force
 
-            echo "Reiniciando Nginx..."
-            systemctl reload nginx
+            echo "🔄 Reiniciando Nginx..."
+            systemctl restart nginx
 
-            echo "Deploy concluído!"
+            echo "✅ Deploy concluído com sucesso!"
