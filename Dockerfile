@@ -1,6 +1,6 @@
 FROM php:8.2-fpm
 
-# Install system dependencies
+# Instalar dependências
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -9,28 +9,40 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     zip \
     unzip \
-    libpq-dev
+    libpq-dev \
+    nginx \
+    supervisor
 
-# Clear cache
+# Limpar cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
+# Instalar extensões PHP
 RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd
 
-# Get latest Composer
+# Obter Composer mais recente
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
-WORKDIR /var/www
+# Configurar diretório de trabalho
+WORKDIR /var/www/html
 
-# Copy existing application directory
-COPY . /var/www
+# Copiar código existente
+COPY . .
 
-# Change ownership of our applications
-RUN chown -R www-data:www-data /var/www
+# Instalar dependências do Composer
+RUN composer install --optimize-autoloader --no-dev
 
-# Expose port 9000
-EXPOSE 9000
+# Configurar permissões
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Start php-fpm server
-CMD ["php-fpm"]
+# Configurar NGINX
+COPY docker/nginx.conf /etc/nginx/sites-available/default
+RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
+
+# Configurar Supervisor
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expor a porta
+EXPOSE 80
+
+# Iniciar Supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
