@@ -135,6 +135,11 @@ server { \n\
     index index.php; \n\
     client_max_body_size 100M; \n\
     \n\
+    # Ajustes de buffer para evitar 502 Bad Gateway \n\
+    fastcgi_buffers 16 16k; \n\
+    fastcgi_buffer_size 32k; \n\
+    fastcgi_intercept_errors off; \n\
+    \n\
     # Aumentar timeouts \n\
     fastcgi_read_timeout 300; \n\
     proxy_read_timeout 300; \n\
@@ -142,6 +147,22 @@ server { \n\
     # Log de depuração \n\
     error_log /dev/stderr; \n\
     access_log /dev/stdout; \n\
+    \n\
+    # Headers CORS \n\
+    add_header '\''Access-Control-Allow-Origin'\'' '\''*'\'' always; \n\
+    add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\'' always; \n\
+    add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\'' always; \n\
+    \n\
+    # Handle OPTIONS preflight requests \n\
+    if (\\$request_method = '\''OPTIONS'\'') { \n\
+        add_header '\''Access-Control-Allow-Origin'\'' '\''*'\''; \n\
+        add_header '\''Access-Control-Allow-Methods'\'' '\''GET, POST, OPTIONS, PUT, DELETE'\''; \n\
+        add_header '\''Access-Control-Allow-Headers'\'' '\''Origin, X-Requested-With, Content-Type, Accept, Authorization'\''; \n\
+        add_header '\''Access-Control-Max-Age'\'' 1728000; \n\
+        add_header '\''Content-Type'\'' '\''text/plain; charset=utf-8'\''; \n\
+        add_header '\''Content-Length'\'' 0; \n\
+        return 204; \n\
+    } \n\
     \n\
     location / { \n\
         try_files \\$uri \\$uri/ /index.php?\\$query_string; \n\
