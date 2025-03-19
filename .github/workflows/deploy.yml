@@ -38,8 +38,13 @@ jobs:
               git clone git@github.com:douglashub/app-backend.git /var/www/app-backend
             fi
             cd /var/www/app-backend
-            git pull origin main
-
+            
+            echo "🔧 Forçando estratégia de pull..."
+            git config pull.rebase false  # Ensure merge strategy
+            git reset --hard origin/main   # Reset local branch to remote
+            
+            git pull origin main --rebase  # Apply rebase strategy to avoid conflicts
+            
             echo "📦 Instalando dependências do Laravel..."
             docker-compose exec -T app composer install --no-dev --optimize-autoloader
 
