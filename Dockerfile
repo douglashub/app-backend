@@ -35,7 +35,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
     && docker-php-ext-install gd pdo pdo_pgsql mbstring exif pcntl bcmath zip
 
-# Install Composer
+# Install Composer (copiado da imagem oficial composer)
 COPY --from=composer:2.5.4 /usr/bin/composer /usr/bin/composer
 
 # Create necessary directories with proper permissions
@@ -63,23 +63,23 @@ RUN composer install --optimize-autoloader --no-dev --no-scripts \
     && php artisan key:generate --force \
     && chown -R www-data:www-data /var/www/html/vendor
 
-# Ensure migrate.sh has execute permissions
+# Ensure migrate.sh has execute permissions, if it exists
 RUN if [ -f /var/www/html/deploy/migrate.sh ]; then \
     chmod +x /var/www/html/deploy/migrate.sh; \
     chown www-data:www-data /var/www/html/deploy/migrate.sh; \
 fi
 
-# Configure PHP-FPM para usar apenas Unix Socket
+# Configure PHP-FPM para usar apenas Unix Socket com permissão 0666
 RUN sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
     && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
     && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.mode = 0660" >> /usr/local/etc/php-fpm.d/www.conf
+    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf
 
 # Criar diretório do socket do PHP-FPM
 RUN mkdir -p /run/php && chown -R www-data:www-data /run/php
 
-# Nginx Configuration
+# Nginx Configuration (arquivo simples para /etc/nginx/sites-available/default)
 RUN echo 'server { \
     listen 80; \
     server_name _; \
@@ -103,7 +103,7 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/sites-available/default
 
-# Supervisor configuration para garantir que o PHP-FPM inicia corretamente
+# Supervisor configuration para gerenciar PHP-FPM + Nginx
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 user=root\n\
@@ -131,7 +131,7 @@ while :; do\n\
   sleep 12h\n\
 done' > /usr/local/bin/certbot-auto-renew && chmod +x /usr/local/bin/certbot-auto-renew
 
-# Criar o script de inicialização do container
+# Criar o script de inicialização do container (start-container)
 RUN echo '#!/bin/bash\n\
 # Garantir que os diretórios existam e tenham as permissões corretas\n\
 mkdir -p /var/www/html/storage/framework/sessions\n\
