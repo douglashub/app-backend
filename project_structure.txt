@@ -39,10 +39,10 @@ server {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
-    # Suporte a PHP-FPM com socket UNIX
+    # Suporte a PHP-FPM via TCP
     location ~ \.php$ {
         include fastcgi_params;
-        fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_pass app:9000;  # Conecta ao serviço "app" na porta 9000
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     }
@@ -98,7 +98,6 @@ services:
       - /var/www/html/vendor
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
-      - /run/php:/run/php  # Montar o diretório do socket PHP-FPM
     env_file:
       - .env
     healthcheck:
@@ -124,7 +123,6 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt           # Montar certificados SSL no container
       - /var/lib/letsencrypt:/var/lib/letsencrypt
       - ./certbot-www:/var/www/letsencrypt
-      - /run/php:/run/php  # Montar o socket PHP-FPM no Nginx
     depends_on:
       - app
     networks:
@@ -150,6 +148,7 @@ services:
 networks:
   laravel_network:
     driver: bridge
+
 === /Users/micaelsantana/Documents/app-backend/Dockerfile ===
 
 # Use PHP 8.2 FPM base image
@@ -168,7 +167,6 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     libpq-dev \
-    nginx \
     supervisor \
     certbot \
     libfreetype6-dev \
@@ -188,6 +186,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 # Configure and install PHP extensions (GD, pdo_pgsql, etc.)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
     && docker-php-ext-install gd pdo pdo_pgsql mbstring exif pcntl bcmath zip
+
+# Configure PHP-FPM para escutar via TCP na porta 9000
+# (Substitui a configuração padrão que usa Unix socket)
+RUN sed -i "s|^listen =.*|listen = 9000|" /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i "s|^;listen.owner.*|listen.owner = www-data|" /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i "s|^;listen.group.*|listen.group = www-data|" /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i "s|^;listen.mode.*|listen.mode = 0660|" /usr/local/etc/php-fpm.d/www.conf
 
 # Install Composer (copiado da imagem oficial composer)
 COPY --from=composer:2.5.4 /usr/bin/composer /usr/bin/composer
@@ -223,40 +228,7 @@ RUN if [ -f /var/www/html/deploy/migrate.sh ]; then \
     chown www-data:www-data /var/www/html/deploy/migrate.sh; \
 fi
 
-# Remover qualquer arquivo zz-docker.conf que sobrescreva o socket
-RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \
-    && mkdir -p /run/php && chown -R www-data:www-data /run/php
-
-# Nginx default configuration (opcional, se rodar Nginx no mesmo container)
-RUN echo 'server { \
-    listen 80; \
-    server_name _; \
-    root /var/www/html/public; \
-    index index.php index.html; \
-    error_log  /var/log/nginx/error.log; \
-    access_log /var/log/nginx/access.log; \
-    client_max_body_size 100M; \
-    location /.well-known/acme-challenge/ { \
-        root /certbot-www; \
-        allow all; \
-    } \
-    location / { \
-        try_files $uri $uri/ /index.php?$query_string; \
-    } \
-    location ~ \.php$ { \
-        include fastcgi_params; \
-        fastcgi_pass unix:/run/php/php-fpm.sock; \
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name; \
-        fastcgi_index index.php; \
-    } \
-}' > /etc/nginx/sites-available/default
-
-# Supervisor configuration (para gerenciar PHP-FPM + Nginx)
+# Supervisor configuration (opcional – se quiser usar Supervisor para gerenciar processos no contêiner)
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 user=root\n\
@@ -267,36 +239,11 @@ autorestart=true\n\
 stdout_logfile=/dev/stdout\n\
 stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
-stderr_logfile_maxbytes=0\n\
-[program:nginx]\n\
-command=/usr/sbin/nginx -g 'daemon off;'\n\
-autostart=true\n\
-autorestart=true\n\
-stdout_logfile=/dev/stdout\n\
-stdout_logfile_maxbytes=0\n\
-stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
-
-# Certbot Auto-renewal script
-RUN echo '#!/bin/bash\n\
-while :; do\n\
-  certbot renew --webroot -w /certbot-www --quiet\n\
-  sleep 12h\n\
-done' > /usr/local/bin/certbot-auto-renew && chmod +x /usr/local/bin/certbot-auto-renew
 
 # Script de inicialização do container (start-container)
 RUN echo '#!/bin/bash\n\
-# Garantir que os diretórios existam e tenham as permissões corretas\n\
-mkdir -p /var/www/html/storage/framework/sessions\n\
-mkdir -p /var/www/html/storage/framework/views\n\
-mkdir -p /var/www/html/storage/framework/cache\n\
-mkdir -p /var/www/html/bootstrap/cache\n\
-mkdir -p /run/php\n\
-chown -R www-data:www-data /var/www/html/storage\n\
-chown -R www-data:www-data /var/www/html/bootstrap/cache\n\
-chown -R www-data:www-data /run/php\n\
-\n\
-# Executar as migrations do Laravel\n\
+# Executar as migrations do Laravel se houver\n\
 if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
     echo "Executando script de migração..."\n\
     bash /var/www/html/deploy/migrate.sh\n\
@@ -305,20 +252,21 @@ else\n\
     cd /var/www/html && php artisan migrate --force\n\
 fi\n\
 \n\
-# Iniciar Supervisor (para gerenciar PHP-FPM e Nginx)\n\
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
+# Iniciar o PHP-FPM em primeiro plano\n\
+exec php-fpm --nodaemonize' > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Expose ports (caso rode Nginx + PHP-FPM no mesmo container)
-EXPOSE 80 443
+# Expose porta 9000 para PHP-FPM (usada internamente)
+EXPOSE 9000
 
 # Start the container
 CMD ["/usr/local/bin/start-container"]
+
 === /Users/micaelsantana/Documents/app-backend/deploy.sh ===
 
 #!/bin/bash
 
-set -e  # Para o script caso qualquer comando retorne erro
+set -e  # Sair se ocorrer qualquer erro
 
 echo "🚀 Starting Deployment Process"
 
@@ -363,20 +311,17 @@ sed -i "s|DB_DATABASE=.*|DB_DATABASE=defaultdb|" .env
 sed -i "s|DB_USERNAME=.*|DB_USERNAME=doadmin|" .env
 sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 
-echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile (listen.mode = 0666)..."
-# Faz backup do Dockerfile original
-cp Dockerfile Dockerfile.bak
-
-# Remove qualquer instrução duplicada, e insere a config "listen.mode = 0666"
-sed -i '/listen.mode/c\    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \\' Dockerfile
-
-echo "✅ Dockerfile atualizado com sucesso!"
+# A configuração do PHP-FPM já foi definida no Dockerfile (listen = 9000 via TCP)
+echo "✅ Using Dockerfile configuration for PHP-FPM (listen = 9000)"
 
 echo "🐳 Stopping and Removing Old Containers..."
-docker-compose down --volumes --remove-orphans
+docker-compose down --rmi all --volumes --remove-orphans
+docker system prune -af
+docker volume prune -f
 
 echo "🐳 Building and Restarting Docker Containers..."
-docker-compose up -d --build
+docker-compose build --no-cache
+docker-compose up -d --force-recreate --build
 
 echo "🔄 Checking PostgreSQL Connection..."
 DB_HOST="db-postgres-api-micasan-do-user-20111967-0.f.db.ondigitalocean.com"
@@ -385,9 +330,9 @@ MAX_ATTEMPTS=10
 ATTEMPT=1
 
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-    echo "  -> Tentativa $ATTEMPT de $MAX_ATTEMPTS"
+    echo "  -> Attempt $ATTEMPT of $MAX_ATTEMPTS"
     if nc -zvw3 "$DB_HOST" "$DB_PORT"; then
-        echo "✅ Banco de dados PostgreSQL acessível!"
+        echo "✅ PostgreSQL is accessible!"
         break
     fi
     ATTEMPT=$((ATTEMPT+1))
@@ -395,22 +340,22 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
 done
 
 if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-    echo "❌ Não foi possível conectar ao PostgreSQL depois de $MAX_ATTEMPTS tentativas."
+    echo "❌ Could not connect to PostgreSQL after $MAX_ATTEMPTS attempts."
     exit 1
 fi
 
-echo "⏳ Aguardando containers subirem completamente..."
+echo "⏳ Waiting for containers to be fully up..."
 sleep 15
 
-echo "🔄 Limpando caches do Laravel..."
+echo "🔄 Clearing Laravel caches..."
 docker-compose exec -T app php artisan config:clear
 docker-compose exec -T app php artisan cache:clear
 docker-compose exec -T app php artisan config:cache
 
-echo "📦 Install composer dependencies..."
+echo "📦 Installing Composer dependencies..."
 docker-compose exec -T app composer install --no-dev --optimize-autoloader
 
-echo "⚡ npm install & build..."
+echo "⚡ Running npm install & build..."
 docker-compose exec -T app bash -c "npm install && npm run build"
 
 echo "📊 Running migrations..."
@@ -420,11 +365,11 @@ echo "🔄 Restarting Nginx..."
 docker-compose restart nginx
 sleep 5
 
-echo "🔍 Testando acesso via HTTPS..."
+echo "🔍 Testing HTTPS access..."
 if curl -sk --head https://api.micasan.com.br | grep -q '200 OK'; then
-    echo "✅ Aplicação está acessível!"
+    echo "✅ Application is accessible!"
 else
-    echo "❌ Ainda não acessível. Logs do NGINX abaixo:"
+    echo "❌ Application is not accessible. Nginx logs below:"
     docker-compose logs --tail=50 nginx
 fi
 
