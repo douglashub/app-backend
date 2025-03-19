@@ -53,8 +53,9 @@ RUN cp .env.example .env && php artisan key:generate --force
 # ✅ Copy migration script instead of creating it inline
 COPY deploy/migrate.sh /var/www/html/deploy/migrate.sh
 
-# Ensure migrate.sh has proper permissions
+# Ensure migrate.sh has execute permissions for all users
 RUN chmod +x /var/www/html/deploy/migrate.sh \
+    && chmod 755 /var/www/html/deploy/migrate.sh \
     && chown -R www-data:www-data /var/www/html/deploy
 
 # Nginx Configuration (inside container)
