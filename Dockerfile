@@ -125,6 +125,29 @@ while :; do\n\
   sleep 12h\n\
 done' > /usr/local/bin/certbot-auto-renew && chmod +x /usr/local/bin/certbot-auto-renew
 
+# Criar o script de inicialização do container
+RUN echo '#!/bin/bash\n\
+# Garantir que os diretórios existam e tenham as permissões corretas\n\
+mkdir -p /var/www/html/storage/framework/sessions\n\
+mkdir -p /var/www/html/storage/framework/views\n\
+mkdir -p /var/www/html/storage/framework/cache\n\
+mkdir -p /var/www/html/bootstrap/cache\n\
+chown -R www-data:www-data /var/www/html/storage\n\
+chown -R www-data:www-data /var/www/html/bootstrap/cache\n\
+\n\
+# Executar as migrations do Laravel\n\
+if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
+    echo "Executando script de migração..."\n\
+    sudo -u www-data bash /var/www/html/deploy/migrate.sh\n\
+else\n\
+    echo "Rodando Laravel migrations..."\n\
+    cd /var/www/html && sudo -u www-data php artisan migrate --force\n\
+fi\n\
+\n\
+# Iniciar Supervisor (para gerenciar PHP-FPM e Nginx)\n\
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
+    && chmod +x /usr/local/bin/start-container
+
 # Expose ports
 EXPOSE 80 443
 
