@@ -98,7 +98,7 @@ services:
       - /var/www/html/vendor
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
-      - /run/php:/run/php  # 🛠️ Montar o diretório do socket PHP-FPM
+      - /run/php:/run/php  # Montar o diretório do socket PHP-FPM
     env_file:
       - .env
     healthcheck:
@@ -121,10 +121,10 @@ services:
       - .:/var/www/html
       - /var/www/html/vendor
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - /etc/letsencrypt:/etc/letsencrypt  # ✅ Mount SSL certs into the container
+      - /etc/letsencrypt:/etc/letsencrypt           # Montar certificados SSL no container
       - /var/lib/letsencrypt:/var/lib/letsencrypt
       - ./certbot-www:/var/www/letsencrypt
-      - /run/php:/run/php  # 🛠️ Montar o socket PHP-FPM no Nginx
+      - /run/php:/run/php  # Montar o socket PHP-FPM no Nginx
     depends_on:
       - app
     networks:
@@ -140,7 +140,12 @@ services:
       - ./certbot-www:/var/www/letsencrypt
     depends_on:
       - nginx
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/letsencrypt --quiet; sleep 12h & wait $${!}; done'"
+    entrypoint: >
+      /bin/sh -c 'trap exit TERM;
+      while :;
+      do certbot renew --webroot -w /var/www/letsencrypt --quiet;
+      sleep 12h & wait $${!};
+      done'
 
 networks:
   laravel_network:
@@ -175,12 +180,12 @@ RUN apt-get update && apt-get install -y \
     dnsutils \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js and npm (Fix compatibility issues)
+# Install Node.js and npm (versão 18.x)
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && npm install -g npm@10
 
-# Configure and install PHP extensions
+# Configure and install PHP extensions (GD, pdo_pgsql, etc.)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
     && docker-php-ext-install gd pdo pdo_pgsql mbstring exif pcntl bcmath zip
 
@@ -198,7 +203,7 @@ RUN mkdir -p /var/www/html/storage/framework/sessions \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/letsencrypt /certbot-www \
     && chown -R www-data:www-data /var/www/html /var/www/letsencrypt /certbot-www
 
-# Set environment variable to allow Composer to run as root/superuser
+# Set environment variable to allow Composer to run as root
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
 # Copy all application files
@@ -218,17 +223,16 @@ RUN if [ -f /var/www/html/deploy/migrate.sh ]; then \
     chown www-data:www-data /var/www/html/deploy/migrate.sh; \
 fi
 
-# Configure PHP-FPM para usar apenas Unix Socket com permissão 0666
-RUN sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
+# Remover qualquer arquivo zz-docker.conf que sobrescreva o socket
+RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf \
+    && sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
     && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
     && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf
+    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \
+    && mkdir -p /run/php && chown -R www-data:www-data /run/php
 
-# Criar diretório do socket do PHP-FPM
-RUN mkdir -p /run/php && chown -R www-data:www-data /run/php
-
-# Nginx Configuration (arquivo simples para /etc/nginx/sites-available/default)
+# Nginx default configuration (opcional, se rodar Nginx no mesmo container)
 RUN echo 'server { \
     listen 80; \
     server_name _; \
@@ -252,7 +256,7 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/sites-available/default
 
-# Supervisor configuration para gerenciar PHP-FPM + Nginx
+# Supervisor configuration (para gerenciar PHP-FPM + Nginx)
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 user=root\n\
@@ -280,7 +284,7 @@ while :; do\n\
   sleep 12h\n\
 done' > /usr/local/bin/certbot-auto-renew && chmod +x /usr/local/bin/certbot-auto-renew
 
-# Criar o script de inicialização do container (start-container)
+# Script de inicialização do container (start-container)
 RUN echo '#!/bin/bash\n\
 # Garantir que os diretórios existam e tenham as permissões corretas\n\
 mkdir -p /var/www/html/storage/framework/sessions\n\
@@ -305,7 +309,7 @@ fi\n\
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Expose ports
+# Expose ports (caso rode Nginx + PHP-FPM no mesmo container)
 EXPOSE 80 443
 
 # Start the container
@@ -359,32 +363,14 @@ sed -i "s|DB_DATABASE=.*|DB_DATABASE=defaultdb|" .env
 sed -i "s|DB_USERNAME=.*|DB_USERNAME=doadmin|" .env
 sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 
-echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile..."
+echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile (listen.mode = 0666)..."
 # Faz backup do Dockerfile original
 cp Dockerfile Dockerfile.bak
 
-# Remove qualquer instrução duplicada que já crie o socket em outro lugar, e insere nossa config limpinha
-sed -i '/# Configure PHP-FPM/,/# Nginx Configuration/d' Dockerfile
-
-cat >> Dockerfile << 'EOF'
-
-# Configure PHP-FPM para usar somente Unix Socket e remover zz-docker.conf
-RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \
-    && mkdir -p /run/php && chown -R www-data:www-data /run/php
-
-# Nginx Configuration
-EOF
+# Remove qualquer instrução duplicada, e insere a config "listen.mode = 0666"
+sed -i '/listen.mode/c\    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \\' Dockerfile
 
 echo "✅ Dockerfile atualizado com sucesso!"
-
-echo "🔧 Modificando script de entrypoint (opcional, se precisar)..."
-# Se você tiver alguma customização extra de entrypoint, pode fazer aqui.
-# Se não precisar, só ignore.
 
 echo "🐳 Stopping and Removing Old Containers..."
 docker-compose down --volumes --remove-orphans

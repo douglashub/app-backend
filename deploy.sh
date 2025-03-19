@@ -49,7 +49,7 @@ echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile (listen.mode = 0
 # Faz backup do Dockerfile original
 cp Dockerfile Dockerfile.bak
 
-# Remove qualquer instrução duplicada, e insere a config "listen.mode = 0666"
+# Remove qualquer instrução duplicada de listen.mode e insere "listen.mode = 0666"
 sed -i '/listen.mode/c\    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \\' Dockerfile
 
 echo "✅ Dockerfile atualizado com sucesso!"

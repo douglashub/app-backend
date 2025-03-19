@@ -144,10 +144,10 @@ chown -R www-data:www-data /run/php\n\
 \n\
 # Executar as migrations do Laravel\n\
 if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
-    echo "Executando script de migração..."\n\
+    echo \"Executando script de migração...\"\n\
     bash /var/www/html/deploy/migrate.sh\n\
 else\n\
-    echo "Rodando Laravel migrations..."\n\
+    echo \"Rodando Laravel migrations...\"\n\
     cd /var/www/html && php artisan migrate --force\n\
 fi\n\
 \n\
