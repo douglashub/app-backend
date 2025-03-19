@@ -45,32 +45,14 @@ sed -i "s|DB_DATABASE=.*|DB_DATABASE=defaultdb|" .env
 sed -i "s|DB_USERNAME=.*|DB_USERNAME=doadmin|" .env
 sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 
-echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile..."
+echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile (listen.mode = 0666)..."
 # Faz backup do Dockerfile original
 cp Dockerfile Dockerfile.bak
 
-# Remove qualquer instrução duplicada que já crie o socket em outro lugar, e insere nossa config limpinha
-sed -i '/# Configure PHP-FPM/,/# Nginx Configuration/d' Dockerfile
-
-cat >> Dockerfile << 'EOF'
-
-# Configure PHP-FPM para usar somente Unix Socket e remover zz-docker.conf
-RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \
-    && mkdir -p /run/php && chown -R www-data:www-data /run/php
-
-# Nginx Configuration
-EOF
+# Remove qualquer instrução duplicada, e insere a config "listen.mode = 0666"
+sed -i '/listen.mode/c\    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \\' Dockerfile
 
 echo "✅ Dockerfile atualizado com sucesso!"
-
-echo "🔧 Modificando script de entrypoint (opcional, se precisar)..."
-# Se você tiver alguma customização extra de entrypoint, pode fazer aqui.
-# Se não precisar, só ignore.
 
 echo "🐳 Stopping and Removing Old Containers..."
 docker-compose down --volumes --remove-orphans
