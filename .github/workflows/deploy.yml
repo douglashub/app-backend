@@ -9,19 +9,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install SSH Key
+      - name: 🔑 Setup SSH Key
         run: |
+          echo "⚙️ Configurando chave SSH..."
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
-          echo "Chave SSH configurada com sucesso!"
+          echo "✅ Chave SSH configurada com sucesso!"
 
-      - name: Deploy via SSH
+      - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DROPLET_IP }}
@@ -31,12 +33,12 @@ jobs:
             set -e
             
             echo "🔄 Atualizando código..."
-            if [ ! -d "/var/www/laravel-api" ]; then
-              git clone git@github.com:micaelparadox/api-laravel.git /var/www/laravel-api
+            if [ ! -d "/var/www/app-backend" ]; then
+              git clone git@github.com:douglashub/app-backend.git /var/www/app-backend
             fi
-            cd /var/www/laravel-api
+            cd /var/www/app-backend
             git pull origin main
-            
+
             echo "📦 Instalando dependências do Laravel..."
             docker-compose exec -T app composer install --no-dev --optimize-autoloader
 
