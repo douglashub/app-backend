@@ -50,21 +50,12 @@ RUN composer install --optimize-autoloader --no-dev
 # Generate application key (after ensuring `.env` exists)
 RUN cp .env.example .env && php artisan key:generate --force
 
-# Migration script with database connection check
-RUN echo '#!/bin/bash \n\
-MAX_ATTEMPTS=10 \n\
-ATTEMPT=0 \n\
-DB_HOST="db-postgres-api-micasan-do-user-20111967-0.f.db.ondigitalocean.com" \n\
-DB_PORT="25060" \n\
-while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do \n\
-    echo "Checking PostgreSQL connection (Attempt $((ATTEMPT+1))/$MAX_ATTEMPTS)" \n\
-    nc -zv $DB_HOST $DB_PORT && break \n\
-    sleep 5 \n\
-    ATTEMPT=$((ATTEMPT+1)) \n\
-done \n\
-echo "Running migrations..." \n\
-php artisan migrate --force' > /var/www/html/deploy/migrate.sh \
-    && chmod +x /var/www/html/deploy/migrate.sh
+# ✅ Copy migration script instead of creating it inline
+COPY deploy/migrate.sh /var/www/html/deploy/migrate.sh
+
+# Ensure migrate.sh has proper permissions
+RUN chmod +x /var/www/html/deploy/migrate.sh \
+    && chown -R www-data:www-data /var/www/html/deploy
 
 # Nginx Configuration (inside container)
 RUN echo 'server { \
