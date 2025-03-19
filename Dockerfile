@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     nginx \
     supervisor \
+    certbot \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
     libwebp-dev \
@@ -38,8 +39,10 @@ RUN mkdir -p /var/www/html/storage/framework/sessions \
     /var/www/html/storage/framework/cache \
     /var/www/html/bootstrap/cache \
     /var/www/html/deploy \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chown -R www-data:www-data /var/www/html
+    /var/www/letsencrypt \
+    /certbot-www \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/letsencrypt /certbot-www \
+    && chown -R www-data:www-data /var/www/html /var/www/letsencrypt /certbot-www
 
 # Set environment variable to allow Composer to run as root/superuser
 ENV COMPOSER_ALLOW_SUPERUSER=1
@@ -76,6 +79,10 @@ RUN echo 'server { \
     error_log  /var/log/nginx/error.log; \
     access_log /var/log/nginx/access.log; \
     client_max_body_size 100M; \
+    location /.well-known/acme-challenge/ { \
+        root /certbot-www; \
+        allow all; \
+    } \
     location / { \
         try_files $uri $uri/ /index.php?$query_string; \
     } \
@@ -111,36 +118,15 @@ stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# Create start script
+# Certbot Auto-renewal script
 RUN echo '#!/bin/bash\n\
-# Make sure directories exist and have correct permissions\n\
-mkdir -p /var/www/html/storage/framework/sessions\n\
-mkdir -p /var/www/html/storage/framework/views\n\
-mkdir -p /var/www/html/storage/framework/cache\n\
-mkdir -p /var/www/html/bootstrap/cache\n\
-chown -R www-data:www-data /var/www/html/storage\n\
-chown -R www-data:www-data /var/www/html/bootstrap/cache\n\
-\n\
-# Run migrations if migrate.sh exists and is executable\n\
-if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
-    echo "Running migration script..."\n\
-    sudo -u www-data bash /var/www/html/deploy/migrate.sh\n\
-else\n\
-    echo "Running Laravel migrations..."\n\
-    cd /var/www/html && sudo -u www-data php artisan migrate --force\n\
-fi\n\
-\n\
-# Start Supervisor\n\
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
-    && chmod +x /usr/local/bin/start-container
+while :; do\n\
+  certbot renew --webroot -w /certbot-www --quiet\n\
+  sleep 12h\n\
+done' > /usr/local/bin/certbot-auto-renew && chmod +x /usr/local/bin/certbot-auto-renew
 
-# Install sudo for the start script
-RUN apt-get update && apt-get install -y sudo \
-    && apt-get clean && rm -rf /var/lib/apt/lists/* \
-    && echo "www-data ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-
-# Expose port 80
-EXPOSE 80
+# Expose ports
+EXPOSE 80 443
 
 # Start the container
 CMD ["/usr/local/bin/start-container"]
