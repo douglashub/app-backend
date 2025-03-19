@@ -69,11 +69,15 @@ RUN if [ -f /var/www/html/deploy/migrate.sh ]; then \
     chown www-data:www-data /var/www/html/deploy/migrate.sh; \
 fi
 
-# Configure PHP-FPM
-RUN echo 'listen = /run/php/php-fpm.sock' >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo 'listen.owner = www-data' >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo 'listen.group = www-data' >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo 'listen.mode = 0660' >> /usr/local/etc/php-fpm.d/www.conf
+# Configure PHP-FPM para usar apenas Unix Socket
+RUN sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
+    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "listen.mode = 0660" >> /usr/local/etc/php-fpm.d/www.conf
+
+# Criar diretório do socket do PHP-FPM
+RUN mkdir -p /run/php && chown -R www-data:www-data /run/php
 
 # Nginx Configuration
 RUN echo 'server { \
@@ -99,15 +103,12 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/sites-available/default
 
-# Make sure the sock directory exists
-RUN mkdir -p /run/php
-
-# Supervisor configuration
+# Supervisor configuration para garantir que o PHP-FPM inicia corretamente
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 user=root\n\
 [program:php-fpm]\n\
-command=/usr/local/sbin/php-fpm\n\
+command=/usr/local/sbin/php-fpm --nodaemonize\n\
 autostart=true\n\
 autorestart=true\n\
 stdout_logfile=/dev/stdout\n\
@@ -137,8 +138,10 @@ mkdir -p /var/www/html/storage/framework/sessions\n\
 mkdir -p /var/www/html/storage/framework/views\n\
 mkdir -p /var/www/html/storage/framework/cache\n\
 mkdir -p /var/www/html/bootstrap/cache\n\
+mkdir -p /run/php\n\
 chown -R www-data:www-data /var/www/html/storage\n\
 chown -R www-data:www-data /var/www/html/bootstrap/cache\n\
+chown -R www-data:www-data /run/php\n\
 \n\
 # Executar as migrations do Laravel\n\
 if [ -x /var/www/html/deploy/migrate.sh ]; then\n\

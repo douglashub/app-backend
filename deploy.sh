@@ -15,7 +15,7 @@ cd /var/www/app-backend || exit
 
 echo "🔄 Pulling Latest Code with Rebase Strategy..."
 git fetch origin main
-git reset --hard origin/main
+git reset --hard origin main
 git pull --rebase origin main
 
 echo "🔍 Checking Docker Installation..."
@@ -51,6 +51,63 @@ docker-compose down --volumes --remove-orphans
 
 echo "🐳 Building and Restarting Docker Containers..."
 docker-compose up -d --build
+
+# 🔍 Verificação do PHP-FPM e Socket
+echo "🔍 Verificando configuração do PHP-FPM..."
+# Aguardar até que os containers estejam totalmente inicializados
+sleep 10
+
+# Verificar se o diretório /run/php existe no container app
+echo "Verificando diretório do socket PHP-FPM..."
+if docker-compose exec app sh -c "[ -d /run/php ]"; then
+    echo "✅ Diretório /run/php existe no container app"
+else
+    echo "❌ Diretório /run/php não encontrado! Criando..."
+    docker-compose exec app sh -c "mkdir -p /run/php && chown -R www-data:www-data /run/php"
+fi
+
+# Verificar se o socket do PHP-FPM está funcionando
+echo "Verificando socket PHP-FPM..."
+if docker-compose exec app sh -c "ls -la /run/php/php-fpm.sock 2>/dev/null"; then
+    echo "✅ Socket PHP-FPM existe e está configurado corretamente!"
+else
+    echo "⚠️ Socket PHP-FPM não encontrado! Verificando configuração..."
+    
+    # Verificar configuração do PHP-FPM
+    docker-compose exec app sh -c "grep -r 'listen = ' /usr/local/etc/php-fpm.d/"
+    
+    # Corrigir configuração se necessário
+    echo "🔧 Corrigindo configuração do PHP-FPM..."
+    docker-compose exec app sh -c "sed -i \"s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|\" /usr/local/etc/php-fpm.d/www.conf \
+        && sed -i \"s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|\" /usr/local/etc/php-fpm.d/www.conf \
+        && mkdir -p /run/php \
+        && chown -R www-data:www-data /run/php"
+    
+    # Reiniciar o PHP-FPM
+    echo "🔄 Reiniciando PHP-FPM..."
+    docker-compose exec app sh -c "killall php-fpm || true"
+    docker-compose exec app sh -c "/usr/local/sbin/php-fpm --nodaemonize &"
+    sleep 5
+    
+    # Verificar novamente
+    if docker-compose exec app sh -c "ls -la /run/php/php-fpm.sock 2>/dev/null"; then
+        echo "✅ Socket PHP-FPM agora está funcionando corretamente!"
+    else
+        echo "❌ Ainda há problemas com o socket PHP-FPM. Verificando logs..."
+        docker-compose logs app
+        echo "⚠️ Continuando a implantação, mas podem ocorrer problemas com o PHP-FPM."
+    fi
+fi
+
+# Verificar se o Nginx pode acessar o socket
+echo "Verificando acesso do Nginx ao socket PHP-FPM..."
+if docker-compose exec nginx sh -c "ls -la /run/php/php-fpm.sock 2>/dev/null"; then
+    echo "✅ Nginx pode acessar o socket PHP-FPM!"
+else
+    echo "❌ Nginx não consegue acessar o socket PHP-FPM! Verificando montagem de volumes..."
+    docker-compose exec nginx sh -c "ls -la /run/php/"
+    echo "⚠️ A comunicação entre Nginx e PHP-FPM pode estar comprometida."
+fi
 
 # ✅ Ensure Database is Reachable Before Running Migrations
 MAX_ATTEMPTS=10
@@ -114,5 +171,17 @@ fi"
 # ✅ Restart Nginx (inside container, not host service)
 echo "🔄 Restarting Nginx Container..."
 docker-compose restart nginx
+
+# Verificação final
+echo "🔍 Executando verificação final do serviço..."
+# Verificar se o site está acessível externamente
+echo "Verificando acesso ao site..."
+if curl -s --head https://api.micasan.com.br | grep "200 OK"; then
+    echo "✅ Site está acessível externamente! A comunicação Nginx-PHP-FPM está funcionando corretamente!"
+else
+    echo "❌ Problemas ao acessar o site externamente! Verificando logs:"
+    docker-compose logs nginx
+    docker-compose logs app
+fi
 
 echo "✅ Deployment Completed Successfully!"

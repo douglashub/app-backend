@@ -11,6 +11,7 @@ services:
       - /var/www/html/vendor
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
+      - /run/php:/run/php  # 🛠️ Montar o diretório do socket PHP-FPM
     env_file:
       - .env
     healthcheck:
@@ -36,6 +37,7 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt  # ✅ Mount SSL certs into the container
       - /var/lib/letsencrypt:/var/lib/letsencrypt
       - ./certbot-www:/var/www/letsencrypt
+      - /run/php:/run/php  # 🛠️ Montar o socket PHP-FPM no Nginx
     depends_on:
       - app
     networks:
