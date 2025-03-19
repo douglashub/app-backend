@@ -100,6 +100,16 @@ docker-compose exec app sh -c "npm install && npm run build"
 echo "📊 Running Laravel Migrations..."
 docker-compose exec app php artisan migrate --force
 
+# ✅ Start Laravel PHP server if necessary
+echo "🚀 Ensuring Laravel is running..."
+docker-compose exec app sh -c "
+if ! pgrep -f 'artisan serve' > /dev/null; then
+    echo '🔄 Starting Laravel PHP server...'
+    nohup php artisan serve --host=0.0.0.0 --port=8000 > storage/logs/laravel-server.log 2>&1 &
+else
+    echo '✅ Laravel PHP server is already running.'
+fi"
+
 # ✅ Restart Nginx (inside container, not host service)
 echo "🔄 Restarting Nginx Container..."
 docker-compose restart nginx
