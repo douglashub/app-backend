@@ -50,13 +50,13 @@ RUN composer install --optimize-autoloader --no-dev
 # Generate application key (after ensuring `.env` exists)
 RUN cp .env.example .env && php artisan key:generate --force
 
-# ✅ Copy migration script instead of creating it inline
+# Copy migration script instead of creating it inline
 COPY deploy/migrate.sh /var/www/html/deploy/migrate.sh
 
 # Ensure migrate.sh has execute permissions for all users
 RUN chmod +x /var/www/html/deploy/migrate.sh \
     && chmod 755 /var/www/html/deploy/migrate.sh \
-    && chown -R www-data:www-data /var/www/html/deploy
+    && chown www-data:www-data /var/www/html/deploy/migrate.sh
 
 # Nginx Configuration (inside container)
 RUN echo 'server { \
@@ -83,19 +83,29 @@ command=/usr/local/sbin/php-fpm\n\
 autostart=true\n\
 autorestart=true\n\
 stdout_logfile=/dev/stdout\n\
+stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
+stderr_logfile_maxbytes=0\n\
 [program:nginx]\n\
 command=/usr/sbin/nginx -g 'daemon off;'\n\
 autostart=true\n\
 autorestart=true\n\
 stdout_logfile=/dev/stdout\n\
-stderr_logfile=/dev/stderr" > /etc/supervisor/conf.d/supervisord.conf
+stdout_logfile_maxbytes=0\n\
+stderr_logfile=/dev/stderr\n\
+stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# Create start script
-RUN echo '#!/bin/bash \n\
-# Ensure PostgreSQL is ready \n\
-/var/www/html/deploy/migrate.sh \n\
-# Start Supervisor \n\
+# Create start script with inline migrate script as fallback
+RUN echo '#!/bin/bash\n\
+# Try to run the migration script\n\
+if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
+    echo "Running migration script..."\n\
+    bash /var/www/html/deploy/migrate.sh\n\
+else\n\
+    echo "Migration script not executable, running inline migration..."\n\
+    php /var/www/html/artisan migrate --force\n\
+fi\n\
+# Start Supervisor\n\
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
