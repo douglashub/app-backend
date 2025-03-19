@@ -41,11 +41,14 @@ RUN mkdir -p /var/www/html/storage/framework/sessions \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
     && chown -R www-data:www-data /var/www/html
 
-# Copy application files
-COPY . .
+# Copy composer files first for better cache utilization
+COPY composer.json composer.lock ./
 
 # Install Composer dependencies
 RUN composer install --optimize-autoloader --no-dev
+
+# Copy application files (after dependencies are installed)
+COPY . .
 
 # Generate application key (after ensuring `.env` exists)
 RUN cp .env.example .env && php artisan key:generate --force
@@ -97,6 +100,11 @@ stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
 # Create start script with inline migrate script as fallback
 RUN echo '#!/bin/bash\n\
+# Check if vendor directory exists
+if [ ! -d /var/www/html/vendor ]; then\n\
+    echo "Vendor directory missing. Running composer install..."\n\
+    composer install --no-dev --optimize-autoloader\n\
+fi\n\
 # Try to run the migration script\n\
 if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
     echo "Running migration script..."\n\
