@@ -14,7 +14,6 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     libpq-dev \
-    nginx \
     supervisor \
     certbot \
     libfreetype6-dev \
@@ -34,6 +33,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
 # Configure and install PHP extensions (GD, pdo_pgsql, etc.)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
     && docker-php-ext-install gd pdo pdo_pgsql mbstring exif pcntl bcmath zip
+
+# Configure PHP-FPM para escutar via TCP na porta 9000
+# (Substitui a configuração padrão que usa Unix socket)
+RUN sed -i "s|^listen =.*|listen = 9000|" /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i "s|^;listen.owner.*|listen.owner = www-data|" /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i "s|^;listen.group.*|listen.group = www-data|" /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i "s|^;listen.mode.*|listen.mode = 0660|" /usr/local/etc/php-fpm.d/www.conf
 
 # Install Composer (copiado da imagem oficial composer)
 COPY --from=composer:2.5.4 /usr/bin/composer /usr/bin/composer
@@ -69,40 +75,7 @@ RUN if [ -f /var/www/html/deploy/migrate.sh ]; then \
     chown www-data:www-data /var/www/html/deploy/migrate.sh; \
 fi
 
-# Remover qualquer arquivo zz-docker.conf que sobrescreva o socket
-RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf \
-    && sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \
-    && mkdir -p /run/php && chown -R www-data:www-data /run/php
-
-# Nginx default configuration (opcional, se rodar Nginx no mesmo container)
-RUN echo 'server { \
-    listen 80; \
-    server_name _; \
-    root /var/www/html/public; \
-    index index.php index.html; \
-    error_log  /var/log/nginx/error.log; \
-    access_log /var/log/nginx/access.log; \
-    client_max_body_size 100M; \
-    location /.well-known/acme-challenge/ { \
-        root /certbot-www; \
-        allow all; \
-    } \
-    location / { \
-        try_files $uri $uri/ /index.php?$query_string; \
-    } \
-    location ~ \.php$ { \
-        include fastcgi_params; \
-        fastcgi_pass unix:/run/php/php-fpm.sock; \
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name; \
-        fastcgi_index index.php; \
-    } \
-}' > /etc/nginx/sites-available/default
-
-# Supervisor configuration (para gerenciar PHP-FPM + Nginx)
+# Supervisor configuration (opcional – se quiser usar Supervisor para gerenciar processos no contêiner)
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
 user=root\n\
@@ -113,50 +86,25 @@ autorestart=true\n\
 stdout_logfile=/dev/stdout\n\
 stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
-stderr_logfile_maxbytes=0\n\
-[program:nginx]\n\
-command=/usr/sbin/nginx -g 'daemon off;'\n\
-autostart=true\n\
-autorestart=true\n\
-stdout_logfile=/dev/stdout\n\
-stdout_logfile_maxbytes=0\n\
-stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
-
-# Certbot Auto-renewal script
-RUN echo '#!/bin/bash\n\
-while :; do\n\
-  certbot renew --webroot -w /certbot-www --quiet\n\
-  sleep 12h\n\
-done' > /usr/local/bin/certbot-auto-renew && chmod +x /usr/local/bin/certbot-auto-renew
 
 # Script de inicialização do container (start-container)
 RUN echo '#!/bin/bash\n\
-# Garantir que os diretórios existam e tenham as permissões corretas\n\
-mkdir -p /var/www/html/storage/framework/sessions\n\
-mkdir -p /var/www/html/storage/framework/views\n\
-mkdir -p /var/www/html/storage/framework/cache\n\
-mkdir -p /var/www/html/bootstrap/cache\n\
-mkdir -p /run/php\n\
-chown -R www-data:www-data /var/www/html/storage\n\
-chown -R www-data:www-data /var/www/html/bootstrap/cache\n\
-chown -R www-data:www-data /run/php\n\
-\n\
-# Executar as migrations do Laravel\n\
+# Executar as migrations do Laravel se houver\n\
 if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
-    echo \"Executando script de migração...\"\n\
+    echo "Executando script de migração..."\n\
     bash /var/www/html/deploy/migrate.sh\n\
 else\n\
-    echo \"Rodando Laravel migrations...\"\n\
+    echo "Rodando Laravel migrations..."\n\
     cd /var/www/html && php artisan migrate --force\n\
 fi\n\
 \n\
-# Iniciar Supervisor (para gerenciar PHP-FPM e Nginx)\n\
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
+# Iniciar o PHP-FPM em primeiro plano\n\
+exec php-fpm --nodaemonize' > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# Expose ports (caso rode Nginx + PHP-FPM no mesmo container)
-EXPOSE 80 443
+# Expose porta 9000 para PHP-FPM (usada internamente)
+EXPOSE 9000
 
 # Start the container
 CMD ["/usr/local/bin/start-container"]

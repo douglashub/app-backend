@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Para o script caso qualquer comando retorne erro
+set -e  # Sair se ocorrer qualquer erro
 
 echo "🚀 Starting Deployment Process"
 
@@ -45,20 +45,23 @@ sed -i "s|DB_DATABASE=.*|DB_DATABASE=defaultdb|" .env
 sed -i "s|DB_USERNAME=.*|DB_USERNAME=doadmin|" .env
 sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 
-echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile (listen.mode = 0666)..."
+echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile (listen = 9000)..."
 # Faz backup do Dockerfile original
 cp Dockerfile Dockerfile.bak
 
-# Remove qualquer instrução duplicada de listen.mode e insere "listen.mode = 0666"
-sed -i '/listen.mode/c\    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \\' Dockerfile
+# (Opcional) Verificar se a linha de configuração do listen já está definida
+grep "^listen =" /usr/local/etc/php-fpm.d/www.conf || echo "listen = 9000" >> /usr/local/etc/php-fpm.d/www.conf
 
 echo "✅ Dockerfile atualizado com sucesso!"
 
 echo "🐳 Stopping and Removing Old Containers..."
-docker-compose down --volumes --remove-orphans
+docker-compose down --rmi all --volumes --remove-orphans
+docker system prune -af
+docker volume prune -f
 
 echo "🐳 Building and Restarting Docker Containers..."
-docker-compose up -d --build
+docker-compose build --no-cache
+docker-compose up -d --force-recreate --build
 
 echo "🔄 Checking PostgreSQL Connection..."
 DB_HOST="db-postgres-api-micasan-do-user-20111967-0.f.db.ondigitalocean.com"
@@ -89,7 +92,7 @@ docker-compose exec -T app php artisan config:clear
 docker-compose exec -T app php artisan cache:clear
 docker-compose exec -T app php artisan config:cache
 
-echo "📦 Install composer dependencies..."
+echo "📦 Installing Composer dependencies..."
 docker-compose exec -T app composer install --no-dev --optimize-autoloader
 
 echo "⚡ npm install & build..."
