@@ -26,10 +26,10 @@ RUN apt-get update && apt-get install -y \
     dnsutils \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ✅ Install Node.js & npm (Required for Laravel frontend)
+# Install Node.js and npm (Fix compatibility issues)
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest
+    && npm install -g npm@10
 
 # Configure and install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
@@ -105,6 +105,7 @@ RUN mkdir -p /run/php
 # Supervisor configuration
 RUN echo "[supervisord]\n\
 nodaemon=true\n\
+user=root\n\
 [program:php-fpm]\n\
 command=/usr/local/sbin/php-fpm\n\
 autostart=true\n\
@@ -122,16 +123,16 @@ stdout_logfile_maxbytes=0\n\
 stderr_logfile=/dev/stderr\n\
 stderr_logfile_maxbytes=0" > /etc/supervisor/conf.d/supervisord.conf
 
-# ✅ Fix Certbot Renewal Issue
+# Certbot Auto-renewal script
 RUN echo '#!/bin/bash\n\
 while :; do\n\
-  certbot renew --non-interactive --agree-tos --email admin@micasan.com.br --webroot -w /certbot-www --quiet\n\
+  certbot renew --webroot -w /certbot-www --quiet\n\
   sleep 12h\n\
 done' > /usr/local/bin/certbot-auto-renew && chmod +x /usr/local/bin/certbot-auto-renew
 
-# ✅ Create the container startup script
+# Criar o script de inicialização do container
 RUN echo '#!/bin/bash\n\
-# Ensure Laravel directories exist and have correct permissions\n\
+# Garantir que os diretórios existam e tenham as permissões corretas\n\
 mkdir -p /var/www/html/storage/framework/sessions\n\
 mkdir -p /var/www/html/storage/framework/views\n\
 mkdir -p /var/www/html/storage/framework/cache\n\
@@ -139,21 +140,21 @@ mkdir -p /var/www/html/bootstrap/cache\n\
 chown -R www-data:www-data /var/www/html/storage\n\
 chown -R www-data:www-data /var/www/html/bootstrap/cache\n\
 \n\
-# Run Laravel migrations\n\
+# Executar as migrations do Laravel\n\
 if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
-    echo "Running migration script..."\n\
+    echo "Executando script de migração..."\n\
     bash /var/www/html/deploy/migrate.sh\n\
 else\n\
-    echo "Running Laravel migrations..."\n\
+    echo "Rodando Laravel migrations..."\n\
     cd /var/www/html && php artisan migrate --force\n\
 fi\n\
 \n\
-# Start Supervisor to manage PHP-FPM & Nginx\n\
+# Iniciar Supervisor (para gerenciar PHP-FPM e Nginx)\n\
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf' > /usr/local/bin/start-container \
     && chmod +x /usr/local/bin/start-container
 
-# ✅ Expose ports
+# Expose ports
 EXPOSE 80 443
 
-# ✅ Start the container
+# Start the container
 CMD ["/usr/local/bin/start-container"]
