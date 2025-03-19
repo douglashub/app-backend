@@ -51,7 +51,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 COPY . .
 
 # Create an .env file if it doesn't exist
-RUN if [ ! -f .env ]; then cp .env.example .env; fi
+RUN test -f .env || cp .env.example .env
 
 # Install Composer dependencies with proper permissions
 RUN composer install --optimize-autoloader --no-dev --no-scripts \
@@ -138,10 +138,10 @@ chown -R www-data:www-data /var/www/html/bootstrap/cache\n\
 # Executar as migrations do Laravel\n\
 if [ -x /var/www/html/deploy/migrate.sh ]; then\n\
     echo "Executando script de migração..."\n\
-    sudo -u www-data bash /var/www/html/deploy/migrate.sh\n\
+    bash /var/www/html/deploy/migrate.sh\n\
 else\n\
     echo "Rodando Laravel migrations..."\n\
-    cd /var/www/html && sudo -u www-data php artisan migrate --force\n\
+    cd /var/www/html && php artisan migrate --force\n\
 fi\n\
 \n\
 # Iniciar Supervisor (para gerenciar PHP-FPM e Nginx)\n\
