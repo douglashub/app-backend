@@ -31,20 +31,19 @@ RUN chmod -R 775 storage bootstrap/cache \
 RUN php artisan key:generate --force
 
 # Configuração do Supervisor para gerenciar processos
-RUN echo "[supervisord]
-nodaemon=true
-
-[program:php-fpm]
-command=/usr/local/sbin/php-fpm
-autostart=true
-autorestart=true
-
-[program:nginx]
-command=nginx -g 'daemon off;'
-autostart=true
-autorestart=true" > /etc/supervisor/conf.d/supervisord.conf
+RUN printf "[supervisord]\n\
+[program:php-fpm]\n\
+command=/usr/local/sbin/php-fpm\n\
+autostart=true\n\
+autorestart=true\n\
+\n\
+[program:nginx]\n\
+command=nginx -g 'daemon off;'\n\
+autostart=true\n\
+autorestart=true\n" > /etc/supervisor/conf.d/supervisord.conf
 
 # Expor portas
 EXPOSE 80 443
 
-CMD ["/usr/bin/supervisord"]
+# Inicia o supervisor para gerenciar processos do PHP e Nginx
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
