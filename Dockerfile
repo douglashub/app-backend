@@ -15,12 +15,16 @@ RUN apt-get update && apt-get install -y \
     supervisor \
     certbot \
     python3-certbot-nginx \
-    && docker-php-ext-install pdo pdo_pgsql bcmath
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd pdo pdo_pgsql bcmath
 
 # Instala o Composer
 COPY --from=composer:2.5.4 /usr/bin/composer /usr/bin/composer
 
-# Copia os arquivos do Laravel (exceto os arquivos desnecessários definidos em .dockerignore)
+# Copia os arquivos do Laravel
 COPY . .
 
 # ✅ Garante que os diretórios necessários existem antes de aplicar permissões
@@ -28,8 +32,8 @@ RUN mkdir -p storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# ✅ Instala as dependências do Laravel ANTES de executar comandos Artisan
-RUN composer install --no-dev --optimize-autoloader
+# ✅ Instala as dependências do Laravel (AGORA que as dependências existem)
+RUN COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader
 
 # ✅ Gera a chave da aplicação Laravel (AGORA que as dependências existem)
 RUN php artisan key:generate --force
