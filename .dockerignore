@@ -21,7 +21,8 @@ Thumbs.db
 # Laravel specific
 /storage/*.key
 /vendor
-.env.backup
+# Force Git to track .env file
+!.env
 .phpunit.result.cache
 storage/logs/
 storage/framework/sessions/
