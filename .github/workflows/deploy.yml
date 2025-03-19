@@ -61,25 +61,25 @@ jobs:
                 chmod +x /usr/local/bin/docker-compose
             fi
 
-            echo "📦 Instalando dependências do Laravel..."
-            docker-compose run --rm app composer install --no-dev --optimize-autoloader
-
-            echo "⚡ Instalando pacotes do front-end..."
-            docker-compose run --rm app npm install && npm run build
-
             echo "📝 Verificando arquivo .env..."
-            if [ ! -f ".env" ]; then
+            if [ ! -f "/var/www/app-backend/.env" ]; then
                 echo "⚠️ Arquivo .env não encontrado! Criando novo..."
                 cp .env.example .env
-                docker-compose run --rm app php artisan key:generate
+                docker-compose exec -T app php artisan key:generate
             fi
+
+            echo "📦 Instalando dependências do Laravel..."
+            docker-compose exec -T app composer install --no-dev --optimize-autoloader
+
+            echo "⚡ Instalando pacotes do front-end..."
+            docker-compose exec -T app npm install && npm run build
 
             echo "⚙️ Criando ambiente Docker..."
             docker-compose down
             docker-compose up -d --build
 
             echo "📊 Rodando migrações..."
-            docker-compose run --rm app php artisan migrate --force
+            docker-compose exec -T app php artisan migrate --force
 
             echo "🔄 Reiniciando Nginx..."
             systemctl restart nginx
