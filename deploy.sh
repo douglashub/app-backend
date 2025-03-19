@@ -108,6 +108,7 @@ if ps aux | grep '[p]hp artisan serve' > /dev/null; then
 else
     echo '🔄 Starting Laravel PHP server...'
     nohup php artisan serve --host=0.0.0.0 --port=8000 > storage/logs/laravel-server.log 2>&1 &
+    disown
 fi"
 
 # ✅ Restart Nginx (inside container, not host service)
