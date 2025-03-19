@@ -34,7 +34,7 @@ services:
       - .:/var/www/html
       - /var/www/html/vendor
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - /etc/letsencrypt:/etc/letsencrypt  # ✅ Mount SSL certs into the container
+      - /etc/letsencrypt:/etc/letsencrypt      # ✅ Mount SSL certs into the container
       - /var/lib/letsencrypt:/var/lib/letsencrypt
       - ./certbot-www:/var/www/letsencrypt
       - /run/php:/run/php  # 🛠️ Montar o socket PHP-FPM no Nginx
@@ -53,7 +53,12 @@ services:
       - ./certbot-www:/var/www/letsencrypt
     depends_on:
       - nginx
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/letsencrypt --quiet; sleep 12h & wait $${!}; done'"
+    entrypoint: >
+      /bin/sh -c 'trap exit TERM;
+      while :;
+      do certbot renew --webroot -w /var/www/letsencrypt --quiet;
+      sleep 12h & wait $${!};
+      done'
 
 networks:
   laravel_network:

@@ -69,15 +69,13 @@ RUN if [ -f /var/www/html/deploy/migrate.sh ]; then \
     chown www-data:www-data /var/www/html/deploy/migrate.sh; \
 fi
 
-# Configure PHP-FPM para usar apenas Unix Socket com permissão 0666
+# Configure PHP-FPM para usar apenas Unix Socket
 RUN sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
     && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
     && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
     && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
-    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf
-
-# Criar diretório do socket do PHP-FPM
-RUN mkdir -p /run/php && chown -R www-data:www-data /run/php
+    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \
+    && mkdir -p /run/php && chown -R www-data:www-data /run/php
 
 # Nginx Configuration (arquivo simples para /etc/nginx/sites-available/default)
 RUN echo 'server { \
