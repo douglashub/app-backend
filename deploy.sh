@@ -15,7 +15,7 @@ cd /var/www/app-backend || exit
 
 echo "🔄 Pulling Latest Code with Rebase Strategy..."
 git fetch origin main
-git reset --hard origin main
+git reset --hard origin/main
 git pull --rebase origin main
 
 echo "🔍 Checking Docker Installation..."
