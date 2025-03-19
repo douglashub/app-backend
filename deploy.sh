@@ -94,9 +94,6 @@ docker-compose exec -T app php artisan db:wipe --force
 echo "📊 Running fresh migrations..."
 docker-compose exec -T app php artisan migrate:fresh --force
 
-echo "🌱 Seeding the database (optional)..."
-docker-compose exec -T app php artisan db:seed --force
-
 echo "🔄 Clearing Laravel caches..."
 docker-compose exec -T app php artisan config:clear
 docker-compose exec -T app php artisan cache:clear
