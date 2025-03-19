@@ -23,8 +23,9 @@ COPY --from=composer:2.5.4 /usr/bin/composer /usr/bin/composer
 # Copia os arquivos do Laravel
 COPY . .
 
-# Ajusta permissões
-RUN chmod -R 775 storage bootstrap/cache \
+# ✅ Garante que os diretórios necessários existem antes de aplicar permissões
+RUN mkdir -p storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
 # Gera a chave da aplicação Laravel
