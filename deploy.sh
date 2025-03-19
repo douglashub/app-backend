@@ -45,14 +45,8 @@ sed -i "s|DB_DATABASE=.*|DB_DATABASE=defaultdb|" .env
 sed -i "s|DB_USERNAME=.*|DB_USERNAME=doadmin|" .env
 sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 
-echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile (listen = 9000)..."
-# Faz backup do Dockerfile original
-cp Dockerfile Dockerfile.bak
-
-# (Opcional) Verificar se a linha de configuração do listen já está definida
-grep "^listen =" /usr/local/etc/php-fpm.d/www.conf || echo "listen = 9000" >> /usr/local/etc/php-fpm.d/www.conf
-
-echo "✅ Dockerfile atualizado com sucesso!"
+# A configuração do PHP-FPM já foi definida no Dockerfile (listen = 9000 via TCP)
+echo "✅ Using Dockerfile configuration for PHP-FPM (listen = 9000)"
 
 echo "🐳 Stopping and Removing Old Containers..."
 docker-compose down --rmi all --volumes --remove-orphans
@@ -70,9 +64,9 @@ MAX_ATTEMPTS=10
 ATTEMPT=1
 
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-    echo "  -> Tentativa $ATTEMPT de $MAX_ATTEMPTS"
+    echo "  -> Attempt $ATTEMPT of $MAX_ATTEMPTS"
     if nc -zvw3 "$DB_HOST" "$DB_PORT"; then
-        echo "✅ Banco de dados PostgreSQL acessível!"
+        echo "✅ PostgreSQL is accessible!"
         break
     fi
     ATTEMPT=$((ATTEMPT+1))
@@ -80,14 +74,14 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
 done
 
 if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-    echo "❌ Não foi possível conectar ao PostgreSQL depois de $MAX_ATTEMPTS tentativas."
+    echo "❌ Could not connect to PostgreSQL after $MAX_ATTEMPTS attempts."
     exit 1
 fi
 
-echo "⏳ Aguardando containers subirem completamente..."
+echo "⏳ Waiting for containers to be fully up..."
 sleep 15
 
-echo "🔄 Limpando caches do Laravel..."
+echo "🔄 Clearing Laravel caches..."
 docker-compose exec -T app php artisan config:clear
 docker-compose exec -T app php artisan cache:clear
 docker-compose exec -T app php artisan config:cache
@@ -95,7 +89,7 @@ docker-compose exec -T app php artisan config:cache
 echo "📦 Installing Composer dependencies..."
 docker-compose exec -T app composer install --no-dev --optimize-autoloader
 
-echo "⚡ npm install & build..."
+echo "⚡ Running npm install & build..."
 docker-compose exec -T app bash -c "npm install && npm run build"
 
 echo "📊 Running migrations..."
@@ -105,11 +99,11 @@ echo "🔄 Restarting Nginx..."
 docker-compose restart nginx
 sleep 5
 
-echo "🔍 Testando acesso via HTTPS..."
+echo "🔍 Testing HTTPS access..."
 if curl -sk --head https://api.micasan.com.br | grep -q '200 OK'; then
-    echo "✅ Aplicação está acessível!"
+    echo "✅ Application is accessible!"
 else
-    echo "❌ Ainda não acessível. Logs do NGINX abaixo:"
+    echo "❌ Application is not accessible. Nginx logs below:"
     docker-compose logs --tail=50 nginx
 fi
 
