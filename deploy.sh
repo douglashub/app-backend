@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -e  # Sair se ocorrer qualquer erro
+set -e  # Exit on any error
 
 echo "🚀 Starting Deployment Process"
 
-# 1) Garantir que o repositório existe
+# 1) Ensure the repository exists
 if [ ! -d "/var/www/app-backend" ]; then
     echo "🔄 Cloning repository..."
     git clone git@github.com:douglashub/app-backend.git /var/www/app-backend
@@ -38,14 +38,13 @@ if [ ! -f ".env" ]; then
     cp .env.example .env
 fi
 
-# Ajusta as variáveis de ambiente do Laravel
+# Update Laravel database environment variables
 sed -i "s|DB_HOST=.*|DB_HOST=db-postgres-api-micasan-do-user-20111967-0.f.db.ondigitalocean.com|" .env
 sed -i "s|DB_PORT=.*|DB_PORT=25060|" .env
 sed -i "s|DB_DATABASE=.*|DB_DATABASE=defaultdb|" .env
 sed -i "s|DB_USERNAME=.*|DB_USERNAME=doadmin|" .env
 sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 
-# A configuração do PHP-FPM já foi definida no Dockerfile (listen = 9000 via TCP)
 echo "✅ Using Dockerfile configuration for PHP-FPM (listen = 9000)"
 
 echo "🐳 Stopping and Removing Old Containers..."
@@ -81,6 +80,15 @@ fi
 echo "⏳ Waiting for containers to be fully up..."
 sleep 15
 
+echo "🔥 Dropping and Recreating the Database..."
+docker-compose exec -T app php artisan db:wipe --force
+
+echo "📊 Running fresh migrations..."
+docker-compose exec -T app php artisan migrate:fresh --force
+
+echo "🌱 Seeding the database (optional)..."
+docker-compose exec -T app php artisan db:seed --force
+
 echo "🔄 Clearing Laravel caches..."
 docker-compose exec -T app php artisan config:clear
 docker-compose exec -T app php artisan cache:clear
@@ -91,9 +99,6 @@ docker-compose exec -T app composer install --no-dev --optimize-autoloader
 
 echo "⚡ Running npm install & build..."
 docker-compose exec -T app bash -c "npm install && npm run build"
-
-echo "📊 Running migrations..."
-docker-compose exec -T app php artisan migrate --force
 
 echo "🔄 Restarting Nginx..."
 docker-compose restart nginx
