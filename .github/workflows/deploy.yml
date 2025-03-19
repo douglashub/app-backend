@@ -1,3 +1,29 @@
+name: Deploy Laravel API to DigitalOcean
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Setup SSH Key
+        run: |
+          echo "⚙️ Configurando chave SSH..."
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+          echo "✅ Chave SSH configurada com sucesso!"
+
       - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -14,38 +40,46 @@
             cd /var/www/app-backend
             
             echo "🔧 Forçando estratégia de pull..."
-            git config pull.rebase false
+            git fetch origin main
             git reset --hard origin/main
             git pull origin main --rebase
 
-            echo "⚙️ Verificando Docker..."
-            if ! command -v docker &> /dev/null; then
-              echo "🚀 Instalando Docker..."
-              apt update && apt install -y docker.io
-              systemctl start docker
-              systemctl enable docker
+            echo "🔍 Verificando se o Docker está instalado..."
+            if ! command -v docker &> /dev/null
+            then
+                echo "🚨 Docker não está instalado. Instalando agora..."
+                apt update && apt install -y docker.io
+                systemctl start docker
+                systemctl enable docker
             fi
 
-            echo "⚙️ Verificando docker-compose..."
-            if ! command -v docker-compose &> /dev/null; then
-              echo "🚀 Instalando docker-compose..."
-              curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              chmod +x /usr/local/bin/docker-compose
-              ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+            echo "🔍 Verificando se o Docker Compose está instalado..."
+            if ! command -v docker-compose &> /dev/null
+            then
+                echo "🚨 Docker Compose não encontrado. Instalando agora..."
+                curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+                chmod +x /usr/local/bin/docker-compose
             fi
 
             echo "📦 Instalando dependências do Laravel..."
-            docker-compose exec -T app composer install --no-dev --optimize-autoloader
+            docker compose exec -T app composer install --no-dev --optimize-autoloader
 
             echo "⚡ Instalando pacotes do front-end..."
-            docker-compose exec -T app npm install && npm run build
+            docker compose exec -T app npm install && npm run build
+
+            echo "📝 Verificando arquivo .env..."
+            if [ ! -f ".env" ]; then
+                echo "⚠️ Arquivo .env não encontrado! Criando novo..."
+                cp .env.example .env
+                docker compose exec -T app php artisan key:generate
+            fi
 
             echo "⚙️ Criando ambiente Docker..."
-            docker-compose down
-            docker-compose up -d --build
+            docker compose down
+            docker compose up -d --build
 
             echo "📊 Rodando migrações..."
-            docker-compose exec -T app php artisan migrate --force
+            docker compose exec -T app php artisan migrate --force
 
             echo "🔄 Reiniciando Nginx..."
             systemctl restart nginx
