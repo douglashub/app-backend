@@ -47,7 +47,7 @@ sed -i "s|DB_USERNAME=.*|DB_USERNAME=doadmin|" .env
 sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 
 echo "🐳 Stopping and Removing Old Containers..."
-docker-compose down
+docker-compose down --volumes --remove-orphans
 
 echo "🐳 Building and Restarting Docker Containers..."
 docker-compose up -d --build
@@ -84,9 +84,17 @@ docker-compose exec app php artisan config:cache
 echo "📦 Installing Laravel Dependencies..."
 docker-compose exec app composer install --no-dev --optimize-autoloader
 
-# ✅ Ensure `npm` is available before installing frontend dependencies
+# ✅ Ensure `npm` is installed before running frontend dependencies
+echo "⚡ Checking if Node.js and npm are installed..."
+docker-compose exec app sh -c "command -v node && command -v npm"
+if [ $? -ne 0 ]; then
+    echo "❌ Node.js and npm not found. Installing..."
+    docker-compose exec app sh -c "curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && apt-get install -y nodejs npm"
+fi
+
+# ✅ Install Frontend Dependencies
 echo "⚡ Installing Frontend Dependencies..."
-docker-compose exec app sh -c "apk add --no-cache nodejs npm && npm install && npm run build"
+docker-compose exec app sh -c "npm install && npm run build"
 
 # ✅ Run Database Migrations
 echo "📊 Running Laravel Migrations..."
