@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 # Instala o Composer
 COPY --from=composer:2.5.4 /usr/bin/composer /usr/bin/composer
 
-# Copia os arquivos do Laravel
+# Copia os arquivos do Laravel (exceto os arquivos desnecessários definidos em .dockerignore)
 COPY . .
 
 # ✅ Garante que os diretórios necessários existem antes de aplicar permissões
@@ -28,7 +28,10 @@ RUN mkdir -p storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# Gera a chave da aplicação Laravel
+# ✅ Instala as dependências do Laravel ANTES de executar comandos Artisan
+RUN composer install --no-dev --optimize-autoloader
+
+# ✅ Gera a chave da aplicação Laravel (AGORA que as dependências existem)
 RUN php artisan key:generate --force
 
 # Configuração do Supervisor para gerenciar processos
