@@ -51,21 +51,7 @@ echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile..."
 if [ -f "Dockerfile" ]; then
     cp Dockerfile Dockerfile.bak
 
-    sed -i '/# Configure PHP-FPM/,/# Nginx Configuration/c\
-# Configure PHP-FPM para usar apenas Unix Socket\
-RUN sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \\\
-    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \\\
-    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \\\
-    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \\\
-    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf \
-\
-# Criar diretório do socket do PHP-FPM\
-RUN mkdir -p /run/php && chown -R www-data:www-data /run/php \
-\
-# Instalar killall para poder gerenciar processos\
-RUN apt-get update && apt-get install -y psmisc procps \
-\
-# Nginx Configuration' Dockerfile
+    sed -i '/# Configure PHP-FPM/,/# Nginx Configuration/c\\n# Configure PHP-FPM para usar apenas Unix Socket\\nRUN sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \\n    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \\n    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \\n    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \\n    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf\\n\\n# Criar diretório do socket do PHP-FPM\\nRUN mkdir -p /run/php && chown -R www-data:www-data /run/php\\n\\n# Instalar killall para poder gerenciar processos\\nRUN apt-get update && apt-get install -y psmisc procps\\n\\n# Nginx Configuration' Dockerfile
 
     echo "✅ Dockerfile atualizado com sucesso para corrigir o PHP-FPM!"
 else
