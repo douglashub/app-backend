@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Exit on any error
+set -e  # Exit immediately if any command fails
 
 echo "🚀 Starting Deployment Process"
 
@@ -49,6 +49,14 @@ echo "✅ Using Dockerfile configuration for PHP-FPM (listen = 9000)"
 
 echo "🐳 Stopping and Removing Old Containers..."
 docker-compose down --rmi all --volumes --remove-orphans
+
+# 🔥 Ensure old networks are removed before recreating them
+echo "🔥 Removing old Docker networks..."
+docker network rm app-backend_default || true
+docker network rm app-backend_laravel_network || true
+docker network prune -f
+
+echo "🐳 Cleaning Docker System..."
 docker system prune -af
 docker volume prune -f
 
