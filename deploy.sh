@@ -48,51 +48,38 @@ sed -i "s|DB_USERNAME=.*|DB_USERNAME=doadmin|" .env
 sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 
 ################################################################################
-# Step 1: Patch Dockerfile to ensure "www.conf" sets mode=0666 for the socket
+# (Optional) Patch Dockerfile if you want to add that "remove zz-docker.conf" block
+#   or you can just manually place it in the Dockerfile and skip the next block.
 ################################################################################
-echo "🔧 Corrigindo a configuração do PHP-FPM no Dockerfile..."
+echo "🔧 Fixing the Dockerfile (Remove zz-docker.conf + set 0666 in www.conf)..."
 if [ -f "Dockerfile" ]; then
-    # Create a backup in case we need to rollback
     cp Dockerfile Dockerfile.bak
 
-    sed -i '/# Configure PHP-FPM/,/# Nginx Configuration/c\\n# Configure PHP-FPM para usar apenas Unix Socket\\nRUN sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \\n    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \\n    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \\n    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \\n    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf\\n\\n# Criar diretório do socket do PHP-FPM\\nRUN mkdir -p /run/php && chown -R www-data:www-data /run/php\\n\\n# Instalar killall para poder gerenciar processos\\nRUN apt-get update && apt-get install -y psmisc procps\\n\\n# Nginx Configuration' Dockerfile
+    # Insert lines that remove zz-docker.conf and ensure listen.mode = 0666
+    # Simplified approach: we look for a placeholder comment
+    # e.g. "# <REMOVE-ZZ-DOCKER-CONF-HERE>" in your Dockerfile to replace 
+    # Or if you prefer, you can just manually add them yourself in the Dockerfile.
+    sed -i '/# <REMOVE-ZZ-DOCKER-CONF-HERE>/r'<(
+      cat <<'INJECT'
+RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf || true
 
-    echo "✅ Dockerfile atualizado com sucesso para corrigir o PHP-FPM!"
+RUN sed -i "s|listen = 127.0.0.1:9000|;listen = 127.0.0.1:9000|" /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i "s|;listen = /run/php/php-fpm.sock|listen = /run/php/php-fpm.sock|" /usr/local/etc/php-fpm.d/www.conf \
+    && echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "listen.mode = 0666" >> /usr/local/etc/php-fpm.d/www.conf
+
+RUN mkdir -p /run/php && chown -R www-data:www-data /run/php
+INJECT
+    ) Dockerfile
+
+    echo "✅ Dockerfile updated: removed zz-docker.conf and forced mode=0666."
 else
-    echo "❌ Dockerfile não encontrado! Verifique o caminho."
+    echo "❌ Dockerfile not found! Check path."
 fi
 
-
 ################################################################################
-# Step 2: Create script that modifies "zz-docker.conf" (or remove it) in runtime
-################################################################################
-echo "🔧 Modificando o arquivo zz-docker.conf para evitar conflitos de socket..."
-cat > docker-php-entrypoint-override.sh << 'EOF'
-#!/bin/sh
-set -e
-
-if [ -f /usr/local/etc/php-fpm.d/zz-docker.conf ]; then
-  echo "⚡ Reconfigurando (ou removendo) zz-docker.conf para não sobrescrever www.conf"
-  rm /usr/local/etc/php-fpm.d/zz-docker.conf
-fi
-
-mkdir -p /run/php
-chown -R www-data:www-data /run/php
-
-exec "$@"
-EOF
-
-chmod +x docker-php-entrypoint-override.sh
-
-cat > Dockerfile.override << 'EOF'
-FROM app-backend-app:latest
-COPY docker-php-entrypoint-override.sh /usr/local/bin/
-ENTRYPOINT ["/usr/local/bin/docker-php-entrypoint-override.sh"]
-CMD ["/usr/local/bin/start-container"]
-EOF
-
-################################################################################
-# Step 3: Bring down old containers, build & start fresh
+# Bring down old containers, build & start fresh
 ################################################################################
 echo "🐳 Stopping and Removing Old Containers..."
 docker-compose down --volumes --remove-orphans
@@ -101,7 +88,7 @@ echo "🐳 Building and Restarting Docker Containers..."
 docker-compose up -d --build
 
 ################################################################################
-# Step 4: Ensure PostgreSQL is reachable
+# Check Postgres connectivity
 ################################################################################
 MAX_ATTEMPTS=10
 ATTEMPT=0
@@ -128,38 +115,23 @@ echo "⏳ Aguardando 15 segundos para os containers inicializarem completamente.
 sleep 15
 
 ################################################################################
-# Step 5: Remove zz-docker.conf (if still there), forcibly set mode=0666, restart
+# (Optionally) supervisorctl or check final socket perms
 ################################################################################
-echo "🔧 Corrigindo o PHP-FPM diretamente no container..."
+echo "🔧 Checking final socket perms inside app container..."
 docker-compose exec -T app bash -c "
-    echo '📋 Verificando configuração atual do PHP-FPM...'
-    if [ -f /usr/local/etc/php-fpm.d/zz-docker.conf ]; then
-      echo 'Removendo zz-docker.conf (override) para não sobrescrever www.conf...'
-      rm /usr/local/etc/php-fpm.d/zz-docker.conf
-    fi
+  echo '🔍 Looking for /usr/local/etc/php-fpm.d/zz-docker.conf:'
+  if [ -f /usr/local/etc/php-fpm.d/zz-docker.conf ]; then
+    echo '⚠️  zz-docker.conf STILL exists; it might override your config!'
+  else
+    echo '✅ zz-docker.conf is not present.'
+  fi
 
-    # Force 0666 in www.conf
-    sed -i 's|listen.mode =.*|listen.mode = 0666|' /usr/local/etc/php-fpm.d/www.conf
-
-    echo '🔄 Ajustando permissões em /run/php...'
-    mkdir -p /run/php
-    chown -R www-data:www-data /run/php
-
-    # Reiniciar via supervisor
-    echo '♻️ Reiniciando PHP-FPM pelo supervisor...'
-    supervisorctl restart php-fpm
-    
-    sleep 3
-    if [ -S /run/php/php-fpm.sock ]; then
-        echo '✅ PHP-FPM socket criado com sucesso!'
-        ls -la /run/php/
-    else
-        echo '❌ Falha ao criar o socket PHP-FPM!'
-    fi
-" || true
+  echo '🔍 Checking php-fpm sock perms:'
+  ls -la /run/php/ || true
+"
 
 ################################################################################
-# Step 6: Clear and rebuild Laravel caches
+# Clear and rebuild Laravel caches
 ################################################################################
 echo "🔄 Clearing Laravel Cache..."
 docker-compose exec -T app php artisan config:clear
@@ -167,13 +139,13 @@ docker-compose exec -T app php artisan cache:clear
 docker-compose exec -T app php artisan config:cache
 
 ################################################################################
-# Step 7: Composer install
+# Composer install
 ################################################################################
 echo "📦 Installing Laravel Dependencies..."
 docker-compose exec -T app composer install --no-dev --optimize-autoloader
 
 ################################################################################
-# Step 8: NPM install & build
+# npm install & build
 ################################################################################
 echo "⚡ Checking if Node.js and npm are installed..."
 docker-compose exec -T app bash -c "command -v node && command -v npm"
@@ -187,20 +159,20 @@ echo "⚡ Installing Frontend Dependencies..."
 docker-compose exec -T app bash -c "npm install && npm run build"
 
 ################################################################################
-# Step 9: Run migrations
+# Migrate
 ################################################################################
 echo "📊 Running Laravel Migrations..."
 docker-compose exec -T app php artisan migrate --force
 
 ################################################################################
-# Step 10: Restart Nginx (just in case)
+# Restart Nginx
 ################################################################################
 echo "🔄 Restarting Nginx Container..."
 docker-compose restart nginx
 sleep 5
 
 ################################################################################
-# Step 11: Final checks
+# Final checks
 ################################################################################
 echo "🔍 Executando verificação final do serviço..."
 docker-compose exec -T app bash -c "ls -la /run/php/"
