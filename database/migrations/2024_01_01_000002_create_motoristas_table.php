@@ -18,7 +18,8 @@ return new class extends Migration
             $table->string('telefone');
             $table->text('endereco');
             $table->date('data_contratacao');
-            $table->enum('status', ['Ativo', 'Ferias', 'Licenca', 'Inativo']);
+            $table->enum('status', ['Ativo', 'Ferias', 'Licenca', 'Inativo'])->default('Ativo');
+            $table->enum('cargo', ['Efetivo', 'ACT', 'Temporário'])->default('Efetivo');
             $table->timestamps();
         });
     }

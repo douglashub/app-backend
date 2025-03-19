@@ -11,10 +11,10 @@ return new class extends Migration
         Schema::create('horarios', function (Blueprint $table) {
             $table->id();
             $table->foreignId('rota_id')->constrained()->onDelete('cascade');
-            $table->time('hora_saida');
-            $table->time('hora_chegada');
+            $table->time('hora_inicio');
+            $table->time('hora_fim');
             $table->json('dias_semana');
-            $table->boolean('ativo')->default(true);
+            $table->boolean('status')->default(true);
             $table->timestamps();
         });
     }

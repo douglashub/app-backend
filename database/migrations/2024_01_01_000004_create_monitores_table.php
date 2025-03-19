@@ -9,13 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('monitores', function (Blueprint $table) {
-            $table->id(); // Standard Laravel auto-increment id
+            $table->id();
             $table->string('nome');
             $table->string('cpf')->unique();
             $table->string('telefone');
             $table->text('endereco');
             $table->date('data_contratacao');
-            $table->enum('status', ['Ativo', 'Ferias', 'Licenca', 'Inativo']);
+            $table->enum('status', ['Ativo', 'Ferias', 'Licenca', 'Inativo'])->default('Ativo');
+            $table->enum('cargo', ['Efetivo', 'ACT', 'Temporário'])->default('Efetivo');
             $table->timestamps();
         });
     }

@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('rota_id')->constrained('rotas')->onDelete('cascade');
             $table->foreignId('parada_id')->constrained('paradas')->onDelete('cascade');
             $table->integer('ordem');
+            $table->integer('tempo_estimado_minutos')->nullable();
             $table->time('horario_estimado')->nullable();
             $table->timestamps();
         });
