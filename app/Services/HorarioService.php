@@ -20,8 +20,13 @@ class HorarioService
 
     public function createHorario(array $data): Horario
     {
+        if (!isset($data['rota_id'])) {
+            throw new \Exception('rota_id is required but missing.');
+        }
+
         return Horario::create($data);
     }
+
 
     public function updateHorario(int $id, array $data): ?Horario
     {
