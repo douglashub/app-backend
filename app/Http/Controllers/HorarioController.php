@@ -56,7 +56,7 @@ class HorarioController extends Controller
             $this->loggingService->logInfo('Creating new horario');
 
             $validatedData = $request->validate([
-                'rota_id' => 'nullable|integer|exists:rotas,id',
+                'rota_id' => 'required|integer|exists:rotas,id',
                 'dias_semana' => 'required|array',
                 'dias_semana.*' => 'integer|min:0|max:6',
                 'hora_inicio' => 'required|date_format:H:i',
