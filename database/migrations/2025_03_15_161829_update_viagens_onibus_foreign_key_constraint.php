@@ -6,16 +6,13 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::table('viagens', function (Blueprint $table) {
-            // Drop the existing foreign key constraint
+            // Remove a antiga chave estrangeira
             $table->dropForeign(['onibus_id']);
             
-            // Add the foreign key constraint with cascade on delete
+            // Adiciona a nova chave estrangeira com `CASCADE ON DELETE`
             $table->foreign('onibus_id')
                   ->references('id')
                   ->on('onibus')
@@ -23,16 +20,13 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('viagens', function (Blueprint $table) {
-            // Drop the modified foreign key constraint
+            // Remove a nova chave estrangeira
             $table->dropForeign(['onibus_id']);
             
-            // Restore the original foreign key constraint without cascade
+            // Restaura a antiga chave estrangeira (sem cascade)
             $table->foreign('onibus_id')
                   ->references('id')
                   ->on('onibus');

@@ -8,8 +8,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('viagens', function (Blueprint $table) {
+            // Adiciona a coluna apenas se ela não existir
             if (!Schema::hasColumn('viagens', 'horario_id')) {
-                $table->bigInteger('horario_id')->unsigned()->after('id');
+                $table->foreignId('horario_id')->nullable()->constrained('horarios')->onDelete('set null')->after('id');
             }
         });
     }
@@ -18,6 +19,7 @@ return new class extends Migration {
     {
         Schema::table('viagens', function (Blueprint $table) {
             if (Schema::hasColumn('viagens', 'horario_id')) {
+                $table->dropForeign(['horario_id']);
                 $table->dropColumn('horario_id');
             }
         });
