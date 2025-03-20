@@ -56,7 +56,7 @@ class HorarioController extends Controller
             $this->loggingService->logInfo('Creating new horario');
 
             $validatedData = $request->validate([
-                'rota_id' => 'required|integer|exists:rotas,id', // ✅ Ensure rota_id exists
+                'rota_id' => 'nullable|integer|exists:rotas,id',
                 'dias_semana' => 'required|array',
                 'dias_semana.*' => 'integer|min:0|max:6',
                 'hora_inicio' => 'required|date_format:H:i',
@@ -64,7 +64,6 @@ class HorarioController extends Controller
                 'status' => 'required|boolean'
             ]);
 
-            // ✅ Ensure `rota_id` is included when calling the service
             $horario = $this->horarioService->createHorario($validatedData);
 
             $this->loggingService->logInfo('Horario created', ['id' => $horario->id]);
@@ -88,6 +87,7 @@ class HorarioController extends Controller
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
 
 
     public function update(Request $request, int $id): JsonResponse
