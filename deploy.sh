@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -e  # Exit immediately if any command fails
+set -e  # Exit immediately on any error
 
 echo "🚀 Starting Deployment Process"
 
-# 1) Ensure the repository exists
+# Ensure the repository exists
 if [ ! -d "/var/www/app-backend" ]; then
     echo "🔄 Cloning repository..."
     git clone git@github.com:douglashub/app-backend.git /var/www/app-backend
@@ -48,17 +48,20 @@ sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 echo "✅ Using Dockerfile configuration for PHP-FPM (listen = 9000)"
 
 echo "🐳 Stopping and Removing Old Containers..."
-docker-compose down --rmi all --volumes --remove-orphans
+docker-compose down --rmi all --volumes --remove-orphans || true
 
-# 🔥 Ensure old networks are removed before recreating them
-echo "🔥 Removing old Docker networks..."
-docker network rm app-backend_default || true
-docker network rm app-backend_laravel_network || true
+# First ensure all containers are down to free up network connections
+echo "🐳 Stopping all containers..."
+docker-compose down --volumes --remove-orphans || true
+
+# Force remove the problematic network 
+echo "🔥 Removing problematic networks..."
+docker network rm app-backend_laravel_network 2>/dev/null || true
+docker network rm laravel_network 2>/dev/null || true
+
+# Clean up any remaining orphaned networks
+echo "🧹 Cleaning up orphaned Docker networks..."
 docker network prune -f
-
-echo "🐳 Cleaning Docker System..."
-docker system prune -af
-docker volume prune -f
 
 echo "🐳 Building and Restarting Docker Containers..."
 docker-compose build --no-cache
@@ -105,7 +108,10 @@ docker-compose exec -T app composer install --no-dev --optimize-autoloader
 echo "⚡ Running npm install & build..."
 docker-compose exec -T app bash -c "npm install && npm run build"
 
-echo "🔄 Restarting Nginx..."
+echo "🔄 Optimizing Laravel and restarting Nginx..."
+docker-compose exec -T app php artisan optimize:clear
+docker-compose exec -T app php artisan view:clear
+docker-compose exec -T app php artisan route:clear
 docker-compose restart nginx
 sleep 5
 
