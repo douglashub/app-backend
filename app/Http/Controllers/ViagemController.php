@@ -56,7 +56,7 @@ class ViagemController extends Controller
                 'onibus_id' => 'required|integer|exists:onibus,id',
                 'motorista_id' => 'required|integer|exists:motoristas,id',
                 'monitor_id' => 'nullable|integer|exists:monitores,id',
-                'horario_id' => 'required|integer|exists:horarios,id',
+                'horario_id' => 'nullable|integer|exists:horarios,id',
                 'hora_saida_prevista' => 'required|date_format:H:i',
                 'hora_chegada_prevista' => 'nullable|date_format:H:i|after:hora_saida_prevista',
                 'hora_saida_real' => 'nullable|date_format:H:i',
