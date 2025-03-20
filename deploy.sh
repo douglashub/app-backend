@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -e  # Exit immediately on any error
+set -e  # Exit immediately if any command fails
 
 echo "🚀 Starting Deployment Process"
 
-# Ensure the repository exists
+# 1) Ensure the repository exists
 if [ ! -d "/var/www/app-backend" ]; then
     echo "🔄 Cloning repository..."
     git clone git@github.com:douglashub/app-backend.git /var/www/app-backend
@@ -48,21 +48,17 @@ sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=AVNS_UnYjI2qmb8fsv0PgrYN|" .env
 echo "✅ Using Dockerfile configuration for PHP-FPM (listen = 9000)"
 
 echo "🐳 Stopping and Removing Old Containers..."
-docker-compose down --rmi all --volumes --remove-orphans || true
+docker-compose down --rmi all --volumes --remove-orphans
 
-# Ensure old networks are removed before recreating them
+# 🔥 Ensure old networks are removed before recreating them
 echo "🔥 Removing old Docker networks..."
-docker network rm app-backend_default 2>/dev/null || true
-docker network rm app-backend_laravel_network 2>/dev/null || true
+docker network rm app-backend_default || true
+docker network rm app-backend_laravel_network || true
 docker network prune -f
 
 echo "🐳 Cleaning Docker System..."
 docker system prune -af
 docker volume prune -f
-
-echo "🌐 Ensuring Docker Network Exists..."
-docker network create app-backend_default 2>/dev/null || true
-docker network create app-backend_laravel_network 2>/dev/null || true
 
 echo "🐳 Building and Restarting Docker Containers..."
 docker-compose build --no-cache
