@@ -9,10 +9,12 @@ class Horario extends Model
 {
     protected $fillable = [
         'rota_id',
-        'hora_inicio',  // Changed from 'hora_saida'
-        'hora_fim',     // Changed from 'hora_chegada'
+        'nome',         // <-- Adicionado
+        'descricao',    // <-- Adicionado
+        'hora_inicio',
+        'hora_fim',
         'dias_semana',
-        'status'        // Changed from 'ativo'
+        'status'
     ];
 
     protected $casts = [

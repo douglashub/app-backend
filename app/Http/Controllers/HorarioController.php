@@ -57,6 +57,8 @@ class HorarioController extends Controller
 
             $validatedData = $request->validate([
                 'rota_id' => 'required|integer|exists:rotas,id',
+                'nome' => 'required|string|max:255',       // <-- Adicionado
+                'descricao' => 'nullable|string|max:255',  // <-- Adicionado
                 'dias_semana' => 'required|array',
                 'dias_semana.*' => 'integer|min:0|max:6',
                 'hora_inicio' => 'required|date_format:H:i',
@@ -95,6 +97,8 @@ class HorarioController extends Controller
         try {
             $this->loggingService->logInfo('Updating horario', ['id' => $id]);
             $validatedData = $request->validate([
+                'nome' => 'sometimes|string|max:255',       // <-- Adicionado
+                'descricao' => 'sometimes|string|max:255',  // <-- Adicionado
                 'dias_semana' => 'sometimes|array',
                 'dias_semana.*' => 'integer|min:0|max:6',
                 'hora_inicio' => 'sometimes|date_format:H:i',
