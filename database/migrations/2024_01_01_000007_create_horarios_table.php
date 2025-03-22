@@ -15,6 +15,7 @@ return new class extends Migration
             $table->time('hora_fim');
             $table->json('dias_semana');
             $table->boolean('status')->default(true);
+            $table->string('tipo')->default('REGULAR');
             $table->timestamps();
         });
     }

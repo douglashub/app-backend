@@ -60,6 +60,7 @@ class HorarioController extends Controller
                 'nome' => 'required|string|max:255',       // <-- Adicionado
                 'descricao' => 'nullable|string|max:255',  // <-- Adicionado
                 'dias_semana' => 'required|array',
+                'tipo' => 'required|in:REGULAR,ESPECIAL',
                 'dias_semana.*' => 'integer|min:0|max:6',
                 'hora_inicio' => 'required|date_format:H:i',
                 'hora_fim' => 'required|date_format:H:i|after:hora_inicio',
@@ -97,14 +98,15 @@ class HorarioController extends Controller
         try {
             $this->loggingService->logInfo('Updating horario', ['id' => $id]);
             $validatedData = $request->validate([
-                'nome' => 'sometimes|string|max:255',       // <-- Adicionado
-                'descricao' => 'sometimes|string|max:255',  // <-- Adicionado
+                'nome' => 'sometimes|string|max:255',
+                'descricao' => 'sometimes|string|max:255',
                 'dias_semana' => 'sometimes|array',
                 'dias_semana.*' => 'integer|min:0|max:6',
                 'hora_inicio' => 'sometimes|date_format:H:i',
                 'hora_fim' => 'sometimes|date_format:H:i|after:hora_inicio',
-                'status' => 'sometimes|boolean'
-            ]);
+                'status' => 'sometimes|boolean',
+                'tipo' => 'sometimes|in:REGULAR,ESPECIAL'
+            ]);            
 
             $horario = $this->horarioService->updateHorario($id, $validatedData);
             if (!$horario) {
